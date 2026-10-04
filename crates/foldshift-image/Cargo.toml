@@ -1,0 +1,13 @@
+[package]
+name = "foldshift-image"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+foldshift-core = { path = "../foldshift-core" }
+image.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true

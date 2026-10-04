@@ -1,0 +1,9 @@
+/target/
+/work/
+/outputs/
+*.fc-part-*
+.DS_Store
+Thumbs.db
+.env
+.env.*
+!.env.example

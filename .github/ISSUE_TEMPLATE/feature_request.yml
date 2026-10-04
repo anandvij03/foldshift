@@ -1,0 +1,26 @@
+name: Feature request
+description: Propose an operation, format, or workflow
+title: "[Feature]: "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What task are you trying to complete?
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Proposed behavior
+      description: "Example input/output formats or command syntax help."
+    validations:
+      required: true
+  - type: textarea
+    id: libraries
+    attributes:
+      label: Existing libraries or tools worth considering
+      description: "Links and known license or platform constraints, if available."
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Current workaround or alternatives
