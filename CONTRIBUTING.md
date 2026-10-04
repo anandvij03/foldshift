@@ -32,6 +32,10 @@ are not required by, or committed to, the project.
 
 ## What to work on
 
+For Antigravity implementation and Codex review, follow
+[the development workflow](docs/DEVELOPMENT-WORKFLOW.md). Use one writer per
+checkout and provide an exact commit/diff when handing over for cleanup.
+
 See [the roadmap](docs/ROADMAP.md). Open an issue before adding a capability,
 large dependency, or changing command syntax. Small bug fixes and documentation
 improvements can go directly to a pull request.

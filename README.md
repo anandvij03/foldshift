@@ -9,6 +9,10 @@ resizing, and inspection. Broader format support and a desktop UI are planned.
 - [Project overview and commands](PROJECT-OVERVIEW.md)
 - [Contributing](CONTRIBUTING.md)
 - [Roadmap](docs/ROADMAP.md)
+- [Development workflow and ownership](docs/DEVELOPMENT-WORKFLOW.md)
+- [Selectable downloads design](docs/CAPABILITIES-AND-DOWNLOADS.md)
+- [First Antigravity handoff](docs/ANTIGRAVITY-HANDOFF.md)
+- [Code review and cleanup checklist](docs/REVIEW-CHECKLIST.md)
 - [GitHub setup checklist](docs/GITHUB-SETUP.md)
 - [Release checklist](docs/RELEASING.md)
 
