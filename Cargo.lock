@@ -184,38 +184,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "caf1079563223d5d59d83c85886a56e586cfd5c1a26292e971a0fa266531ac5a"
 
 [[package]]
-name = "foldshift-cli"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "foldshift-core",
- "foldshift-image",
- "image",
- "serde_json",
- "tempfile",
-]
-
-[[package]]
-name = "foldshift-core"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
- "thiserror",
-]
-
-[[package]]
-name = "foldshift-image"
-version = "0.1.0"
-dependencies = [
- "foldshift-core",
- "image",
- "serde_json",
- "tempfile",
-]
-
-[[package]]
 name = "fdeflate"
 version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -233,6 +201,43 @@ dependencies = [
  "crc32fast",
  "miniz_oxide 0.9.1",
  "zlib-rs",
+]
+
+[[package]]
+name = "foldshift-cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "foldshift-core",
+ "foldshift-image",
+ "gif",
+ "image",
+ "serde_json",
+ "tempfile",
+ "tiff",
+]
+
+[[package]]
+name = "foldshift-core"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
+name = "foldshift-image"
+version = "0.1.0"
+dependencies = [
+ "foldshift-core",
+ "gif",
+ "image",
+ "png",
+ "serde_json",
+ "tempfile",
+ "tiff",
 ]
 
 [[package]]

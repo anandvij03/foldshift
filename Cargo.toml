@@ -16,6 +16,7 @@ rust-version = "1.88"
 [workspace.dependencies]
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
+gif = { version = "0.14", default-features = false }
 image = { version = "0.25", default-features = false, features = [
     "bmp",
     "gif",
@@ -24,10 +25,12 @@ image = { version = "0.25", default-features = false, features = [
     "tiff",
     "webp",
 ] }
+png = { version = "0.18", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
 tempfile = "3"
+tiff = { version = "0.11", default-features = false }
 
 [profile.release]
 lto = "thin"
