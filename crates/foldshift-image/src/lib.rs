@@ -1,5 +1,5 @@
 use std::fs;
-use std::io::{BufWriter, Write};
+use std::io::{BufWriter, Seek, Write};
 use std::path::Path;
 
 use foldshift_core::{FcError, Inspection, MediaKind, Result};
@@ -55,7 +55,10 @@ pub fn inspect(path: &Path) -> Result<Inspection> {
 }
 
 pub fn convert(input: &Path, output: &Path, options: EncodeOptions) -> Result<()> {
+    validate_encode_options(options)?;
+    let _target_format = preflight_target(output, options.force)?;
     ensure_input(input)?;
+    guard_still_image(input)?;
     let image = decode(input)?;
     encode_atomic(&image, output, options)
 }
@@ -67,7 +70,7 @@ pub fn resize(
     height: Option<u32>,
     options: EncodeOptions,
 ) -> Result<(u32, u32)> {
-    ensure_input(input)?;
+    validate_encode_options(options)?;
     if width.is_none() && height.is_none() {
         return Err(FcError::InvalidOption(
             "resize requires --width, --height, or both".into(),
@@ -78,6 +81,9 @@ pub fn resize(
             "resize dimensions must be greater than zero".into(),
         ));
     }
+    let _target_format = preflight_target(output, options.force)?;
+    ensure_input(input)?;
+    guard_still_image(input)?;
 
     let image = decode(input)?;
     let (source_width, source_height) = image.dimensions();
@@ -102,23 +108,130 @@ fn decode(input: &Path) -> Result<DynamicImage> {
         .map_err(|error| FcError::Conversion(error.to_string()))
 }
 
-fn ensure_input(path: &Path) -> Result<()> {
-    if !path.is_file() {
-        return Err(FcError::InputMissing(path.to_path_buf()));
-    }
-    Ok(())
-}
-
-fn encode_atomic(image: &DynamicImage, output: &Path, options: EncodeOptions) -> Result<()> {
+fn validate_encode_options(options: EncodeOptions) -> Result<()> {
     if !(1..=100).contains(&options.quality) {
         return Err(FcError::InvalidOption(
             "quality must be between 1 and 100".into(),
         ));
     }
+    Ok(())
+}
+
+fn preflight_target(output: &Path, force: bool) -> Result<ImageFormat> {
+    let format = format_from_output(output)?;
+    if output.exists() && !force {
+        return Err(FcError::OutputExists(output.to_path_buf()));
+    }
+    Ok(format)
+}
+
+fn ensure_input(path: &Path) -> Result<()> {
+    let metadata = match fs::metadata(path) {
+        Ok(m) => m,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+            return Err(FcError::InputMissing(path.to_path_buf()));
+        }
+        Err(err) => return Err(FcError::Io(err)),
+    };
+    if metadata.is_dir() {
+        return Err(FcError::InvalidOption(format!(
+            "input path is a directory: {}",
+            path.display()
+        )));
+    }
+    Ok(())
+}
+
+fn guard_still_image(path: &Path) -> Result<()> {
+    let file = fs::File::open(path)?;
+    let mut reader = std::io::BufReader::new(file);
+
+    let guessed = ImageReader::new(&mut reader)
+        .with_guessed_format()
+        .map_err(FcError::Io)?;
+    let format = match guessed.format() {
+        Some(f) => f,
+        None => match format_from_output(path) {
+            Ok(f) => f,
+            Err(_) => return Ok(()),
+        },
+    };
+
+    reader.seek(std::io::SeekFrom::Start(0))?;
+
+    match format {
+        ImageFormat::Gif => {
+            let mut options = gif::DecodeOptions::new();
+            options.skip_frame_decoding(true);
+            let mut decoder = options
+                .read_info(&mut reader)
+                .map_err(|e| FcError::Conversion(e.to_string()))?;
+            let has_first = decoder
+                .next_frame_info()
+                .map_err(|e| FcError::Conversion(e.to_string()))?
+                .is_some();
+            let has_second = decoder
+                .next_frame_info()
+                .map_err(|e| FcError::Conversion(e.to_string()))?
+                .is_some();
+            if has_first && has_second {
+                return Err(FcError::UnsupportedContent(
+                    "animated GIF with multiple frames is not supported".into(),
+                ));
+            }
+        }
+        ImageFormat::Png => {
+            let decoder = image::codecs::png::PngDecoder::new(&mut reader)
+                .map_err(|e| FcError::Conversion(e.to_string()))?;
+            if decoder
+                .is_apng()
+                .map_err(|e| FcError::Conversion(e.to_string()))?
+            {
+                return Err(FcError::UnsupportedContent(
+                    "animated PNG (APNG) is not supported".into(),
+                ));
+            }
+        }
+        ImageFormat::WebP => {
+            let decoder = image::codecs::webp::WebPDecoder::new(&mut reader)
+                .map_err(|e| FcError::Conversion(e.to_string()))?;
+            if decoder.has_animation() {
+                return Err(FcError::UnsupportedContent(
+                    "animated WebP is not supported".into(),
+                ));
+            }
+        }
+        ImageFormat::Tiff => {
+            let decoder = tiff::decoder::Decoder::new(&mut reader)
+                .map_err(|e| FcError::Conversion(e.to_string()))?;
+            if decoder.more_images() {
+                return Err(FcError::UnsupportedContent(
+                    "multi-page TIFF is not supported".into(),
+                ));
+            }
+        }
+        _ => {}
+    }
+
+    Ok(())
+}
+
+fn encode_atomic(image: &DynamicImage, output: &Path, options: EncodeOptions) -> Result<()> {
+    validate_encode_options(options)?;
     if output.exists() && !options.force {
         return Err(FcError::OutputExists(output.to_path_buf()));
     }
     let format = format_from_output(output)?;
+
+    if format == ImageFormat::Jpeg
+        && image.color().has_alpha()
+        && image.to_rgba16().pixels().any(|p| p[3] != u16::MAX)
+    {
+        return Err(FcError::InvalidOption(
+            "JPEG cannot preserve transparency; choose PNG or WebP".into(),
+        ));
+    }
+
     let parent = output
         .parent()
         .filter(|path| !path.as_os_str().is_empty())
@@ -131,12 +244,6 @@ fn encode_atomic(image: &DynamicImage, output: &Path, options: EncodeOptions) ->
         let mut writer = BufWriter::new(temporary.as_file_mut());
         match format {
             ImageFormat::Jpeg => {
-                if image.color().has_alpha() && image.to_rgba16().pixels().any(|p| p[3] != u16::MAX)
-                {
-                    return Err(FcError::InvalidOption(
-                        "JPEG cannot preserve transparency; choose PNG or WebP".into(),
-                    ));
-                }
                 let mut encoder = JpegEncoder::new_with_quality(&mut writer, options.quality);
                 encoder
                     .encode_image(&DynamicImage::ImageRgb8(image.to_rgb8()))
@@ -292,5 +399,323 @@ mod tests {
             let path = PathBuf::from(format!("test.{extension}"));
             assert!(format_from_output(&path).is_ok(), "{extension}");
         }
+    }
+
+    fn create_animated_gif() -> Vec<u8> {
+        let mut buffer = Vec::new();
+        {
+            let mut encoder =
+                gif::Encoder::new(&mut buffer, 2, 2, &[0, 0, 0, 255, 255, 255]).unwrap();
+            let frame1 = gif::Frame::from_indexed_pixels(2, 2, [0, 1, 0, 1], None);
+            let frame2 = gif::Frame::from_indexed_pixels(2, 2, [1, 0, 1, 0], None);
+            encoder.write_frame(&frame1).unwrap();
+            encoder.write_frame(&frame2).unwrap();
+        }
+        buffer
+    }
+
+    fn create_single_frame_gif() -> Vec<u8> {
+        let mut buffer = Vec::new();
+        {
+            let mut encoder =
+                gif::Encoder::new(&mut buffer, 2, 2, &[0, 0, 0, 255, 255, 255]).unwrap();
+            let frame1 = gif::Frame::from_indexed_pixels(2, 2, [0, 1, 0, 1], None);
+            encoder.write_frame(&frame1).unwrap();
+        }
+        buffer
+    }
+
+    fn create_multipage_tiff() -> Vec<u8> {
+        let mut cursor = std::io::Cursor::new(Vec::new());
+        {
+            let mut tiff = tiff::encoder::TiffEncoder::new(&mut cursor).unwrap();
+            let image1 = [10u8, 20, 30, 40, 50, 60];
+            tiff.write_image::<tiff::encoder::colortype::RGB8>(2, 1, &image1)
+                .unwrap();
+            let image2 = [70u8, 80, 90, 100, 110, 120];
+            tiff.write_image::<tiff::encoder::colortype::RGB8>(2, 1, &image2)
+                .unwrap();
+        }
+        cursor.into_inner()
+    }
+
+    fn create_singlepage_tiff() -> Vec<u8> {
+        let mut cursor = std::io::Cursor::new(Vec::new());
+        {
+            let mut tiff = tiff::encoder::TiffEncoder::new(&mut cursor).unwrap();
+            let image1 = [10u8, 20, 30, 40, 50, 60];
+            tiff.write_image::<tiff::encoder::colortype::RGB8>(2, 1, &image1)
+                .unwrap();
+        }
+        cursor.into_inner()
+    }
+
+    fn create_animated_png() -> Vec<u8> {
+        let mut buffer = Vec::new();
+        {
+            let mut encoder = png::Encoder::new(&mut buffer, 2, 2);
+            encoder.set_color(png::ColorType::Rgba);
+            encoder.set_depth(png::BitDepth::Eight);
+            encoder.set_animated(2, 0).unwrap();
+            let mut writer = encoder.write_header().unwrap();
+            let frame1 = [255, 0, 0, 255].repeat(4);
+            let frame2 = [0, 255, 0, 255].repeat(4);
+            writer.write_image_data(&frame1).unwrap();
+            writer.write_image_data(&frame2).unwrap();
+        }
+        buffer
+    }
+
+    fn create_animated_webp() -> Vec<u8> {
+        let vp8_payload = [
+            0xd0, 0x01, 0x00, 0x9d, 0x01, 0x2a, 0x02, 0x00, 0x02, 0x00, 0x02, 0x00, 0x34, 0x25,
+            0xa0, 0x02, 0x74, 0xba, 0x01, 0xf8, 0x00, 0x03, 0xb0, 0x00, 0xfe, 0xf0, 0xc4, 0x0b,
+            0xff, 0x20, 0xb9, 0x61, 0x75, 0xc8, 0xd7, 0xff, 0x20, 0x3f, 0xe4, 0x07, 0xfc, 0x80,
+            0xff, 0xf8, 0xf2, 0x00,
+        ];
+        let mut anmf_chunk = Vec::new();
+        anmf_chunk.extend_from_slice(&[0, 0, 0]);
+        anmf_chunk.extend_from_slice(&[0, 0, 0]);
+        anmf_chunk.extend_from_slice(&[1, 0, 0]);
+        anmf_chunk.extend_from_slice(&[1, 0, 0]);
+        anmf_chunk.extend_from_slice(&[100, 0, 0]);
+        anmf_chunk.push(0);
+        anmf_chunk.extend_from_slice(b"VP8 ");
+        anmf_chunk.extend_from_slice(&(vp8_payload.len() as u32).to_le_bytes());
+        anmf_chunk.extend_from_slice(&vp8_payload);
+
+        let mut data = Vec::new();
+        data.extend_from_slice(b"RIFF");
+        data.extend_from_slice(&[0, 0, 0, 0]);
+        data.extend_from_slice(b"WEBP");
+        data.extend_from_slice(b"VP8X");
+        data.extend_from_slice(&10u32.to_le_bytes());
+        data.push(0x02);
+        data.extend_from_slice(&[0, 0, 0]);
+        data.extend_from_slice(&[1, 0, 0]);
+        data.extend_from_slice(&[1, 0, 0]);
+        data.extend_from_slice(b"ANIM");
+        data.extend_from_slice(&6u32.to_le_bytes());
+        data.extend_from_slice(&[0, 0, 0, 0]);
+        data.extend_from_slice(&[0, 0]);
+        data.extend_from_slice(b"ANMF");
+        data.extend_from_slice(&(anmf_chunk.len() as u32).to_le_bytes());
+        data.extend_from_slice(&anmf_chunk);
+
+        let riff_size = (data.len() - 8) as u32;
+        data[4..8].copy_from_slice(&riff_size.to_le_bytes());
+        data
+    }
+
+    #[test]
+    fn rejects_animated_gif_and_preserves_existing_output_on_force() {
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("animated.gif");
+        let output = dir.path().join("output.png");
+        fs::write(&input, create_animated_gif()).unwrap();
+        fs::write(&output, b"pre-existing output").unwrap();
+
+        let result = convert(
+            &input,
+            &output,
+            EncodeOptions {
+                force: true,
+                ..Default::default()
+            },
+        );
+        assert!(matches!(result, Err(FcError::UnsupportedContent(_))));
+        assert_eq!(fs::read(&output).unwrap(), b"pre-existing output");
+
+        let resize_result = resize(
+            &input,
+            &output,
+            Some(10),
+            None,
+            EncodeOptions {
+                force: true,
+                ..Default::default()
+            },
+        );
+        assert!(matches!(resize_result, Err(FcError::UnsupportedContent(_))));
+        assert_eq!(fs::read(&output).unwrap(), b"pre-existing output");
+    }
+
+    #[test]
+    fn supports_single_frame_gif() {
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("single.gif");
+        let output = dir.path().join("output.png");
+        fs::write(&input, create_single_frame_gif()).unwrap();
+
+        convert(&input, &output, EncodeOptions::default()).unwrap();
+        assert_eq!(decode(&output).unwrap().dimensions(), (2, 2));
+
+        let resized_output = dir.path().join("resized.png");
+        let dims = resize(
+            &input,
+            &resized_output,
+            Some(4),
+            None,
+            EncodeOptions::default(),
+        )
+        .unwrap();
+        assert_eq!(dims, (4, 4));
+    }
+
+    #[test]
+    fn rejects_multipage_tiff_and_preserves_existing_output_on_force() {
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("multipage.tiff");
+        let output = dir.path().join("output.png");
+        fs::write(&input, create_multipage_tiff()).unwrap();
+        fs::write(&output, b"pre-existing tiff output").unwrap();
+
+        let result = convert(
+            &input,
+            &output,
+            EncodeOptions {
+                force: true,
+                ..Default::default()
+            },
+        );
+        assert!(matches!(result, Err(FcError::UnsupportedContent(_))));
+        assert_eq!(fs::read(&output).unwrap(), b"pre-existing tiff output");
+    }
+
+    #[test]
+    fn supports_singlepage_tiff() {
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("single.tiff");
+        let output = dir.path().join("output.png");
+        fs::write(&input, create_singlepage_tiff()).unwrap();
+
+        convert(&input, &output, EncodeOptions::default()).unwrap();
+        assert_eq!(decode(&output).unwrap().dimensions(), (2, 1));
+    }
+
+    #[test]
+    fn rejects_animated_png() {
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("animated.png");
+        let output = dir.path().join("output.webp");
+        fs::write(&input, create_animated_png()).unwrap();
+
+        let result = convert(&input, &output, EncodeOptions::default());
+        assert!(matches!(result, Err(FcError::UnsupportedContent(_))));
+        assert!(!output.exists());
+    }
+
+    #[test]
+    fn rejects_animated_webp() {
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("animated.webp");
+        let output = dir.path().join("output.png");
+        fs::write(&input, create_animated_webp()).unwrap();
+
+        let result = convert(&input, &output, EncodeOptions::default());
+        assert!(matches!(result, Err(FcError::UnsupportedContent(_))));
+        assert!(!output.exists());
+    }
+
+    #[test]
+    fn detects_animated_content_regardless_of_extension() {
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("misnamed_gif.png");
+        let output = dir.path().join("output.png");
+        fs::write(&input, create_animated_gif()).unwrap();
+
+        let result = convert(&input, &output, EncodeOptions::default());
+        assert!(matches!(result, Err(FcError::UnsupportedContent(_))));
+        assert!(!output.exists());
+    }
+
+    #[test]
+    fn rejects_directory_input() {
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("some_directory");
+        fs::create_dir(&input).unwrap();
+        let output = dir.path().join("output.png");
+
+        let result = convert(&input, &output, EncodeOptions::default());
+        assert!(matches!(result, Err(FcError::InvalidOption(_))));
+        assert!(!output.exists());
+    }
+
+    #[test]
+    fn preflight_validation_has_no_filesystem_side_effects() {
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("input.png");
+        DynamicImage::new_rgb8(10, 10).save(&input).unwrap();
+
+        let nested_out = dir.path().join("new_dir").join("output.png");
+        assert!(!nested_out.parent().unwrap().exists());
+
+        // 1. Invalid quality rejects without creating parent dir
+        let res = convert(
+            &input,
+            &nested_out,
+            EncodeOptions {
+                quality: 105,
+                ..Default::default()
+            },
+        );
+        assert!(matches!(res, Err(FcError::InvalidOption(_))));
+        assert!(!nested_out.parent().unwrap().exists());
+
+        // 2. Unsupported format rejects without creating parent dir
+        let bad_ext = dir.path().join("new_dir").join("output.unsupported");
+        let res = convert(&input, &bad_ext, EncodeOptions::default());
+        assert!(matches!(res, Err(FcError::UnsupportedFormat(_))));
+        assert!(!bad_ext.parent().unwrap().exists());
+
+        // 3. Resize with zero dimension rejects without creating parent dir
+        let res = resize(&input, &nested_out, Some(0), None, EncodeOptions::default());
+        assert!(matches!(res, Err(FcError::InvalidOption(_))));
+        assert!(!nested_out.parent().unwrap().exists());
+
+        // 4. Missing input rejects without creating parent dir
+        let missing = dir.path().join("missing.png");
+        let res = convert(&missing, &nested_out, EncodeOptions::default());
+        assert!(matches!(res, Err(FcError::InputMissing(_))));
+        assert!(!nested_out.parent().unwrap().exists());
+
+        // 5. Animated input rejects without creating parent dir
+        let anim = dir.path().join("anim.gif");
+        fs::write(&anim, create_animated_gif()).unwrap();
+        let res = convert(&anim, &nested_out, EncodeOptions::default());
+        assert!(matches!(res, Err(FcError::UnsupportedContent(_))));
+        assert!(!nested_out.parent().unwrap().exists());
+    }
+
+    #[test]
+    fn library_quality_validation_independent_of_cli() {
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("input.png");
+        let output = dir.path().join("output.jpg");
+        DynamicImage::new_rgb8(10, 10).save(&input).unwrap();
+
+        assert!(matches!(
+            convert(
+                &input,
+                &output,
+                EncodeOptions {
+                    quality: 0,
+                    ..Default::default()
+                }
+            ),
+            Err(FcError::InvalidOption(_))
+        ));
+
+        assert!(matches!(
+            convert(
+                &input,
+                &output,
+                EncodeOptions {
+                    quality: 101,
+                    ..Default::default()
+                }
+            ),
+            Err(FcError::InvalidOption(_))
+        ));
     }
 }

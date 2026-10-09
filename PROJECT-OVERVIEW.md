@@ -18,6 +18,10 @@ and a graphical interface are planned. No public release has been published yet.
 - Inspect images and report format, dimensions, color type, and file size.
 - Convert between PNG, JPEG, WebP, GIF, BMP, and TIFF.
 - Resize proportionally within a width/height bounding box.
+- Detect and reject animated or multi-page inputs (GIF, APNG, WebP, TIFF) before
+  conversion or decode to prevent silent content loss.
+- Preflight destination format, quality, and collisions early without creating
+  files or directories on invalid requests.
 - Strip embedded metadata as a natural consequence of decode/re-encode.
 - Refuse to overwrite an existing file unless `--force` is supplied.
 - Write to a temporary sibling file before moving the completed output into
@@ -56,15 +60,17 @@ At least one of `--width` and `--height` is required for resize. When only one
 is given, the other dimension is inferred. When both are given, the original
 aspect ratio is preserved and the result fits inside the requested box.
 
-The current image path processes one still frame/page. Animated images and
-multi-page TIFFs are flattened; use it for still images until multi-frame support
-is implemented. Embedded color profiles and orientation metadata are not yet
-preserved or applied. `--quality` controls JPEG only; WebP output is lossless.
-JPEG export rejects transparent pixels; PNG and WebP preserve transparency.
+The current image path processes still images. Animated inputs (GIF, APNG, WebP)
+and multi-page TIFFs are rejected with an explicit error to prevent silent
+content loss. Single-frame GIF and single-page TIFF are supported. Embedded color
+profiles and orientation metadata are not yet preserved or applied. `--quality`
+controls JPEG only; WebP output is lossless. JPEG export rejects transparent
+pixels; PNG and WebP preserve transparency.
 
 Temporary files are managed by the `tempfile` library. Replacement uses its
 persist operation; without `--force`, finalization refuses an existing target,
-including a target created while encoding was running.
+including a target created while encoding was running. Invalid requests fail
+before full decode and do not create output directories or temporary files.
 
 ## Architecture
 

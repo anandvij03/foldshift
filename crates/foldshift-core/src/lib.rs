@@ -72,6 +72,8 @@ pub enum FcError {
     OutputExists(PathBuf),
     #[error("unsupported format: {0}")]
     UnsupportedFormat(String),
+    #[error("unsupported content: {0}")]
+    UnsupportedContent(String),
     #[error("invalid option: {0}")]
     InvalidOption(String),
     #[error("operation is unavailable: {0}")]
