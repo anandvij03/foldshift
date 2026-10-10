@@ -4,7 +4,8 @@ use std::path::Path;
 
 use foldshift_core::{FcError, Inspection, MediaKind, Result};
 use image::codecs::jpeg::JpegEncoder;
-use image::{DynamicImage, GenericImageView, ImageFormat, ImageReader};
+use image::metadata::Orientation;
+use image::{DynamicImage, GenericImageView, ImageDecoder, ImageFormat, ImageReader};
 use serde_json::json;
 
 pub const SUPPORTED_EXTENSIONS: &[&str] =
@@ -34,16 +35,28 @@ pub fn inspect(path: &Path) -> Result<Inspection> {
     let format = reader
         .format()
         .ok_or_else(|| FcError::UnsupportedFormat(path.display().to_string()))?;
-    let image = reader
-        .decode()
+    let mut decoder = reader
+        .into_decoder()
         .map_err(|error| FcError::Conversion(error.to_string()))?;
-    let (width, height) = image.dimensions();
+    let orientation = decoder.orientation().unwrap_or(Orientation::NoTransforms);
+    let (mut width, mut height) = decoder.dimensions();
+    if matches!(
+        orientation,
+        Orientation::Rotate90
+            | Orientation::Rotate270
+            | Orientation::Rotate90FlipH
+            | Orientation::Rotate270FlipH
+    ) {
+        std::mem::swap(&mut width, &mut height);
+    }
+    let color_type = decoder.color_type();
     let metadata = fs::metadata(path)?;
 
     let mut properties = std::collections::BTreeMap::new();
     properties.insert("width".into(), json!(width));
     properties.insert("height".into(), json!(height));
-    properties.insert("color".into(), json!(format!("{:?}", image.color())));
+    properties.insert("color".into(), json!(format!("{:?}", color_type)));
+    properties.insert("orientation".into(), json!(format!("{:?}", orientation)));
 
     Ok(Inspection {
         path: path.to_path_buf(),
@@ -102,10 +115,18 @@ fn scale_dimension(primary: u32, other: u32, requested_other: u32) -> u32 {
 }
 
 fn decode(input: &Path) -> Result<DynamicImage> {
-    ImageReader::open(input)?
-        .with_guessed_format()?
-        .decode()
-        .map_err(|error| FcError::Conversion(error.to_string()))
+    let reader = ImageReader::open(input)
+        .map_err(FcError::Io)?
+        .with_guessed_format()
+        .map_err(FcError::Io)?;
+    let mut decoder = reader
+        .into_decoder()
+        .map_err(|error| FcError::Conversion(error.to_string()))?;
+    let orientation = decoder.orientation().unwrap_or(Orientation::NoTransforms);
+    let mut image = DynamicImage::from_decoder(decoder)
+        .map_err(|error| FcError::Conversion(error.to_string()))?;
+    image.apply_orientation(orientation);
+    Ok(image)
 }
 
 fn validate_encode_options(options: EncodeOptions) -> Result<()> {
@@ -216,6 +237,20 @@ fn guard_still_image(path: &Path) -> Result<()> {
     Ok(())
 }
 
+fn has_transparent_pixels(image: &DynamicImage) -> bool {
+    if !image.color().has_alpha() {
+        return false;
+    }
+    match image {
+        DynamicImage::ImageRgba8(buf) => buf.pixels().any(|p| p[3] != u8::MAX),
+        DynamicImage::ImageRgba16(buf) => buf.pixels().any(|p| p[3] != u16::MAX),
+        DynamicImage::ImageRgba32F(buf) => buf.pixels().any(|p| p[3] < 1.0),
+        DynamicImage::ImageLumaA8(buf) => buf.pixels().any(|p| p[1] != u8::MAX),
+        DynamicImage::ImageLumaA16(buf) => buf.pixels().any(|p| p[1] != u16::MAX),
+        _ => image.pixels().any(|(_, _, p)| p[3] != u8::MAX),
+    }
+}
+
 fn encode_atomic(image: &DynamicImage, output: &Path, options: EncodeOptions) -> Result<()> {
     validate_encode_options(options)?;
     if output.exists() && !options.force {
@@ -223,10 +258,7 @@ fn encode_atomic(image: &DynamicImage, output: &Path, options: EncodeOptions) ->
     }
     let format = format_from_output(output)?;
 
-    if format == ImageFormat::Jpeg
-        && image.color().has_alpha()
-        && image.to_rgba16().pixels().any(|p| p[3] != u16::MAX)
-    {
+    if format == ImageFormat::Jpeg && has_transparent_pixels(image) {
         return Err(FcError::InvalidOption(
             "JPEG cannot preserve transparency; choose PNG or WebP".into(),
         ));
@@ -245,9 +277,36 @@ fn encode_atomic(image: &DynamicImage, output: &Path, options: EncodeOptions) ->
         match format {
             ImageFormat::Jpeg => {
                 let mut encoder = JpegEncoder::new_with_quality(&mut writer, options.quality);
-                encoder
-                    .encode_image(&DynamicImage::ImageRgb8(image.to_rgb8()))
-                    .map_err(|error| FcError::Conversion(error.to_string()))?;
+                match image {
+                    DynamicImage::ImageLuma8(buf) => {
+                        encoder
+                            .encode_image(buf)
+                            .map_err(|error| FcError::Conversion(error.to_string()))?;
+                    }
+                    DynamicImage::ImageLuma16(_) => {
+                        let luma8 = image.to_luma8();
+                        encoder
+                            .encode_image(&luma8)
+                            .map_err(|error| FcError::Conversion(error.to_string()))?;
+                    }
+                    _ if matches!(image.color(), image::ColorType::L8 | image::ColorType::La8) => {
+                        let luma8 = image.to_luma8();
+                        encoder
+                            .encode_image(&luma8)
+                            .map_err(|error| FcError::Conversion(error.to_string()))?;
+                    }
+                    DynamicImage::ImageRgb8(buf) => {
+                        encoder
+                            .encode_image(buf)
+                            .map_err(|error| FcError::Conversion(error.to_string()))?;
+                    }
+                    _ => {
+                        let rgb8 = image.to_rgb8();
+                        encoder
+                            .encode_image(&rgb8)
+                            .map_err(|error| FcError::Conversion(error.to_string()))?;
+                    }
+                }
             }
             other => image
                 .write_to(&mut writer, other)
@@ -717,5 +776,191 @@ mod tests {
             ),
             Err(FcError::InvalidOption(_))
         ));
+    }
+
+    fn create_jpeg_with_exif_orientation(width: u32, height: u32, orientation: u8) -> Vec<u8> {
+        let base = DynamicImage::new_rgb8(width, height);
+        let mut base_jpeg = Vec::new();
+        base.write_to(&mut std::io::Cursor::new(&mut base_jpeg), ImageFormat::Jpeg)
+            .unwrap();
+
+        #[rustfmt::skip]
+        let app1 = [
+            0xFF, 0xE1, 0x00, 0x22,
+            b'E', b'x', b'i', b'f', 0x00, 0x00,
+            b'I', b'I', 0x2A, 0x00, 0x08, 0x00, 0x00, 0x00,
+            0x01, 0x00,
+            0x12, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00,
+            orientation, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00,
+        ];
+
+        let mut output = Vec::with_capacity(base_jpeg.len() + app1.len());
+        output.extend_from_slice(&base_jpeg[..2]); // SOI
+        output.extend_from_slice(&app1);
+        output.extend_from_slice(&base_jpeg[2..]);
+        output
+    }
+
+    #[test]
+    fn exif_orientation_applied_on_decode_and_reported_on_inspect() {
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("portrait.jpg");
+        // Create 12x8 JPEG with orientation 6 (Rotate90)
+        let jpeg_bytes = create_jpeg_with_exif_orientation(12, 8, 6);
+        fs::write(&input, jpeg_bytes).unwrap();
+
+        let inspection = inspect(&input).unwrap();
+        assert_eq!(
+            inspection.properties.get("orientation").unwrap(),
+            "Rotate90"
+        );
+        // Effective dimensions after rotation
+        assert_eq!(inspection.properties.get("width").unwrap(), 8);
+        assert_eq!(inspection.properties.get("height").unwrap(), 12);
+
+        // Convert to PNG and check output pixel dimensions
+        let output = dir.path().join("upright.png");
+        convert(&input, &output, EncodeOptions::default()).unwrap();
+        let decoded = decode(&output).unwrap();
+        assert_eq!(decoded.dimensions(), (8, 12));
+    }
+
+    #[test]
+    fn grayscale_jpeg_and_16bit_downsampling() {
+        let dir = tempfile::tempdir().unwrap();
+
+        // 8-bit Grayscale
+        let gray8_input = dir.path().join("gray8.png");
+        DynamicImage::ImageLuma8(image::GrayImage::from_pixel(10, 10, image::Luma([128])))
+            .save(&gray8_input)
+            .unwrap();
+        let gray_jpg = dir.path().join("gray.jpg");
+        convert(&gray8_input, &gray_jpg, EncodeOptions::default()).unwrap();
+        let insp = inspect(&gray_jpg).unwrap();
+        assert_eq!(insp.properties.get("color").unwrap(), "L8");
+
+        // 16-bit Grayscale downsampled to 8-bit
+        let gray16_input = dir.path().join("gray16.png");
+        DynamicImage::ImageLuma16(image::ImageBuffer::from_pixel(10, 10, image::Luma([32000])))
+            .save(&gray16_input)
+            .unwrap();
+        let gray16_jpg = dir.path().join("gray16.jpg");
+        convert(&gray16_input, &gray16_jpg, EncodeOptions::default()).unwrap();
+        let insp16 = inspect(&gray16_jpg).unwrap();
+        assert_eq!(insp16.properties.get("color").unwrap(), "L8");
+
+        // 16-bit RGB downsampled to 8-bit
+        let rgb16_input = dir.path().join("rgb16.png");
+        DynamicImage::ImageRgb16(image::ImageBuffer::from_pixel(
+            10,
+            10,
+            image::Rgb([32000, 10000, 5000]),
+        ))
+        .save(&rgb16_input)
+        .unwrap();
+        let rgb16_jpg = dir.path().join("rgb16.jpg");
+        convert(&rgb16_input, &rgb16_jpg, EncodeOptions::default()).unwrap();
+        let insp_rgb = inspect(&rgb16_jpg).unwrap();
+        assert_eq!(insp_rgb.properties.get("color").unwrap(), "Rgb8");
+    }
+
+    #[test]
+    fn transparency_rules_and_opaque_alpha_handling() {
+        let dir = tempfile::tempdir().unwrap();
+
+        // 1. Fully opaque alpha channel converts to JPEG without error
+        let opaque_input = dir.path().join("opaque.png");
+        DynamicImage::ImageRgba8(image::RgbaImage::from_pixel(
+            8,
+            8,
+            image::Rgba([100, 150, 200, 255]),
+        ))
+        .save(&opaque_input)
+        .unwrap();
+        let opaque_jpg = dir.path().join("opaque.jpg");
+        assert!(convert(&opaque_input, &opaque_jpg, EncodeOptions::default()).is_ok());
+
+        // 2. Image with truly transparent pixels is rejected for JPEG
+        let transparent_input = dir.path().join("transparent.png");
+        let mut img = image::RgbaImage::from_pixel(8, 8, image::Rgba([100, 150, 200, 255]));
+        img.put_pixel(0, 0, image::Rgba([100, 150, 200, 0]));
+        DynamicImage::ImageRgba8(img)
+            .save(&transparent_input)
+            .unwrap();
+        let transparent_jpg = dir.path().join("transparent.jpg");
+        let err = convert(
+            &transparent_input,
+            &transparent_jpg,
+            EncodeOptions::default(),
+        );
+        assert!(
+            matches!(err, Err(FcError::InvalidOption(msg)) if msg.contains("JPEG cannot preserve transparency"))
+        );
+
+        // 3. PNG and WebP preserve transparency
+        let transparent_webp = dir.path().join("transparent.webp");
+        assert!(
+            convert(
+                &transparent_input,
+                &transparent_webp,
+                EncodeOptions::default()
+            )
+            .is_ok()
+        );
+        let decoded_webp = decode(&transparent_webp).unwrap();
+        assert_eq!(decoded_webp.color(), image::ColorType::Rgba8);
+    }
+
+    #[test]
+    fn has_transparent_pixels_checks_native_buffers_accurately() {
+        // RGB8 has no alpha
+        let rgb = DynamicImage::new_rgb8(2, 2);
+        assert!(!has_transparent_pixels(&rgb));
+
+        // RGBA8 fully opaque
+        let rgba_opaque = DynamicImage::ImageRgba8(image::RgbaImage::from_pixel(
+            2,
+            2,
+            image::Rgba([0, 0, 0, 255]),
+        ));
+        assert!(!has_transparent_pixels(&rgba_opaque));
+
+        // RGBA8 with one pixel having alpha 254
+        let mut rgba_trans = image::RgbaImage::from_pixel(2, 2, image::Rgba([0, 0, 0, 255]));
+        rgba_trans.put_pixel(1, 1, image::Rgba([0, 0, 0, 254]));
+        assert!(has_transparent_pixels(&DynamicImage::ImageRgba8(
+            rgba_trans
+        )));
+
+        // RGBA16 fully opaque
+        let rgba16_opaque = DynamicImage::ImageRgba16(image::ImageBuffer::from_pixel(
+            2,
+            2,
+            image::Rgba([0, 0, 0, u16::MAX]),
+        ));
+        assert!(!has_transparent_pixels(&rgba16_opaque));
+
+        // RGBA16 with one pixel having alpha u16::MAX - 1
+        let mut rgba16_trans =
+            image::ImageBuffer::from_pixel(2, 2, image::Rgba([0, 0, 0, u16::MAX]));
+        rgba16_trans.put_pixel(0, 0, image::Rgba([0, 0, 0, u16::MAX - 1]));
+        assert!(has_transparent_pixels(&DynamicImage::ImageRgba16(
+            rgba16_trans
+        )));
+
+        // LumaA8 fully opaque vs transparent
+        let luma_a_opaque = DynamicImage::ImageLumaA8(image::ImageBuffer::from_pixel(
+            2,
+            2,
+            image::LumaA([128, 255]),
+        ));
+        assert!(!has_transparent_pixels(&luma_a_opaque));
+
+        let mut luma_a_trans = image::ImageBuffer::from_pixel(2, 2, image::LumaA([128, 255]));
+        luma_a_trans.put_pixel(0, 0, image::LumaA([128, 100]));
+        assert!(has_transparent_pixels(&DynamicImage::ImageLumaA8(
+            luma_a_trans
+        )));
     }
 }

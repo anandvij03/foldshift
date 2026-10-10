@@ -62,10 +62,19 @@ aspect ratio is preserved and the result fits inside the requested box.
 
 The current image path processes still images. Animated inputs (GIF, APNG, WebP)
 and multi-page TIFFs are rejected with an explicit error to prevent silent
-content loss. Single-frame GIF and single-page TIFF are supported. Embedded color
-profiles and orientation metadata are not yet preserved or applied. `--quality`
-controls JPEG only; WebP output is lossless. JPEG export rejects transparent
-pixels; PNG and WebP preserve transparency.
+content loss. Single-frame GIF and single-page TIFF are supported. EXIF
+orientation metadata is applied during decode, normalizing pixel geometry to
+produce physically upright output images across all formats; inspection
+reports detected orientation alongside effective dimensions without decoding
+full pixel buffers. Embedded ICC color profiles are not converted or preserved
+(pixels are processed in their source color space). Grayscale images (8-bit and
+16-bit) encode natively as 1-component grayscale JPEGs without channel expansion;
+16-bit color images downsample to 8-bit for formats requiring it (JPEG, WebP, BMP)
+while preserving 16-bit depth for PNG and TIFF. Fully opaque alpha channels are
+safely stripped when saving to JPEG, while truly transparent pixels are rejected
+with an actionable error (`JPEG cannot preserve transparency; choose PNG or WebP`).
+PNG and WebP preserve transparency. `--quality` (1..=100) controls JPEG encoding;
+other formats produce lossless or indexed output and ignore `--quality`.
 
 Temporary files are managed by the `tempfile` library. Replacement uses its
 persist operation; without `--force`, finalization refuses an existing target,
