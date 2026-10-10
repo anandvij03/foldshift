@@ -14,8 +14,13 @@ path = "src/main.rs"
 anyhow.workspace = true
 clap.workspace = true
 foldshift-core = { path = "../foldshift-core" }
-foldshift-image = { path = "../foldshift-image" }
+foldshift-image = { path = "../foldshift-image", optional = true }
 serde_json.workspace = true
+
+[features]
+default = ["image"]
+image = ["dep:foldshift-image"]
+images = ["image"]
 
 [dev-dependencies]
 gif.workspace = true

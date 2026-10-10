@@ -15,9 +15,10 @@ established under Milestone 1 (Task **FS-003**).
 
 ## 2. Executable size baseline
 
-| Binary | Unpacked size | Comparison to historical prototype |
+| Binary Profile | Unpacked size | Comparison to historical prototype / notes |
 |---|---|---|
-| **`foldshift.exe`** (CLI) | **2,014,208 bytes** (~1.92 MB) | **-179,712 bytes (-8.19%)** vs 2,193,920 byte baseline |
+| **`foldshift.exe` (Images profile)** | **2,016,256 bytes** (~1.92 MB) | **-177,664 bytes (-8.10%)** vs 2,193,920 byte prototype (includes pure-Rust image capability) |
+| **`foldshift.exe` (Core-only profile)** | **473,600 bytes** (~462.5 KiB) | **-1,542,656 bytes (-76.5%)** vs Images profile (zero image codecs linked) |
 | **`foldshift-web.exe`** (Local Web UI) | **2,891,264 bytes** (~2.75 MB) | Includes Axum, Tokio, and embedded single-page HTML client |
 
 > **Review trigger threshold**: As defined in `REVIEW-CHECKLIST.md`, executable growth exceeding either **10%** or **256 KiB** against this baseline triggers architectural review.

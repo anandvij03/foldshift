@@ -76,7 +76,7 @@ async fn api_capabilities() -> Json<SystemStatus> {
     Json(SystemStatus {
         version: "0.1.0",
         supported_extensions: foldshift_image::SUPPORTED_EXTENSIONS,
-        capabilities: foldshift_core::operations(),
+        capabilities: foldshift_core::operations_with(|cap| cap == "image"),
     })
 }
 

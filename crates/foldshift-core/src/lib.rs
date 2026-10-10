@@ -79,36 +79,40 @@ pub enum FcError {
 pub type Result<T> = std::result::Result<T, FcError>;
 
 pub fn operations() -> Vec<OperationInfo> {
+    operations_with(|cap| cap == "core")
+}
+
+pub fn operations_with(mut is_available: impl FnMut(&str) -> bool) -> Vec<OperationInfo> {
     vec![
         OperationInfo {
             id: "image.inspect".into(),
             summary: "Inspect an image without modifying it".into(),
             capability: "image".into(),
-            available: true,
+            available: is_available("image"),
         },
         OperationInfo {
             id: "image.convert".into(),
             summary: "Decode and re-encode an image".into(),
             capability: "image".into(),
-            available: true,
+            available: is_available("image"),
         },
         OperationInfo {
             id: "image.resize".into(),
             summary: "Resize an image while preserving aspect ratio".into(),
             capability: "image".into(),
-            available: true,
+            available: is_available("image"),
         },
         OperationInfo {
             id: "pdf.merge".into(),
             summary: "Merge PDF documents".into(),
             capability: "pdf".into(),
-            available: false,
+            available: is_available("pdf"),
         },
         OperationInfo {
             id: "audio.convert".into(),
             summary: "Convert an audio stream".into(),
             capability: "media".into(),
-            available: false,
+            available: is_available("media"),
         },
     ]
 }
@@ -141,5 +145,25 @@ mod tests {
         let json = serde_json::to_string(&insp).unwrap();
         assert!(json.contains("\"media_kind\":\"image\""));
         assert!(json.contains("\"width\":100"));
+    }
+
+    #[test]
+    fn operations_with_filters_availability() {
+        let none = operations();
+        assert!(!none.iter().any(|op| op.available));
+
+        let with_image = operations_with(|cap| cap == "image");
+        let image_ops: Vec<_> = with_image
+            .iter()
+            .filter(|op| op.capability == "image")
+            .collect();
+        assert_eq!(image_ops.len(), 3);
+        assert!(image_ops.iter().all(|op| op.available));
+
+        let non_image_ops: Vec<_> = with_image
+            .iter()
+            .filter(|op| op.capability != "image")
+            .collect();
+        assert!(non_image_ops.iter().all(|op| !op.available));
     }
 }

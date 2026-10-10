@@ -34,7 +34,7 @@ no external agent has been started by this document.
 | M1 | FS-002 | Explicit orientation, color, transparency and quality rules | Antigravity | FS-001 review | Merged |
 | M1 | FS-003 | Reduce inspection allocations; measure size and memory | Codex cleanup | FS-001 handoff | Merged |
 | M1 | FS-004 | Consolidate metadata; remove/defer unused abstraction | Codex cleanup | FS-002/003 | Merged |
-| M2: selectable downloads | FS-010 | Optional image feature and accurate capability reporting | Antigravity | M1 | Queued |
+| M2: selectable downloads | FS-010 | Optional image feature and accurate capability reporting | Antigravity | M1 | Merged |
 | M2 | FS-011 | Core/Images artifacts, download chooser, size manifest | Antigravity | FS-010 | Queued |
 | M2 | FS-012 | Verify minimal dependencies, both profiles and packages | Codex review | FS-011 | Queued |
 | M3: optional PDF | FS-020 | Versioned engine/pack contract and install state | Antigravity | M2 | Queued |

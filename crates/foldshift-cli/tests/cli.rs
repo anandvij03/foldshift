@@ -1,6 +1,51 @@
 use std::process::Command;
 
 #[test]
+fn cli_capabilities_reflects_enabled_capabilities() {
+    let result = Command::new(env!("CARGO_BIN_EXE_foldshift"))
+        .arg("capabilities")
+        .output()
+        .unwrap();
+    assert!(result.status.success());
+    let stdout = String::from_utf8_lossy(&result.stdout);
+    assert!(stdout.contains("CORE   installed"));
+
+    let json_result = Command::new(env!("CARGO_BIN_EXE_foldshift"))
+        .args(["capabilities", "--json"])
+        .output()
+        .unwrap();
+    assert!(json_result.status.success());
+    let data: Vec<serde_json::Value> = serde_json::from_slice(&json_result.stdout).unwrap();
+    let img_convert = data.iter().find(|op| op["id"] == "image.convert").unwrap();
+
+    if cfg!(feature = "image") {
+        assert!(stdout.contains("IMAGE  installed"));
+        assert_eq!(img_convert["available"], true);
+    } else {
+        assert!(stdout.contains("IMAGE  not installed"));
+        assert_eq!(img_convert["available"], false);
+    }
+}
+
+#[cfg(not(feature = "image"))]
+#[test]
+fn cli_core_only_rejects_image_subcommands() {
+    for cmd in ["convert", "image", "inspect"] {
+        let result = Command::new(env!("CARGO_BIN_EXE_foldshift"))
+            .arg(cmd)
+            .output()
+            .unwrap();
+        assert!(!result.status.success());
+        let stderr = String::from_utf8_lossy(&result.stderr);
+        assert!(
+            stderr.contains("unrecognized subcommand") || stderr.contains("error:"),
+            "expected error for '{cmd}', got: {stderr}"
+        );
+    }
+}
+
+#[cfg(feature = "image")]
+#[test]
 fn cli_converts_inspects_and_refuses_overwrite() {
     let dir = tempfile::tempdir().unwrap();
     let input = dir.path().join("source.png");
@@ -39,6 +84,7 @@ fn cli_converts_inspects_and_refuses_overwrite() {
     assert_eq!(data["properties"]["height"], 10);
 }
 
+#[cfg(feature = "image")]
 #[test]
 fn invalid_options_return_failure() {
     let result = Command::new(env!("CARGO_BIN_EXE_foldshift"))
@@ -48,6 +94,7 @@ fn invalid_options_return_failure() {
     assert!(!result.status.success());
 }
 
+#[cfg(feature = "image")]
 #[test]
 fn cli_rejects_animated_gif_and_preserves_destination_on_force() {
     let dir = tempfile::tempdir().unwrap();
@@ -85,6 +132,7 @@ fn cli_rejects_animated_gif_and_preserves_destination_on_force() {
     );
 }
 
+#[cfg(feature = "image")]
 #[test]
 fn cli_rejects_multipage_tiff() {
     let dir = tempfile::tempdir().unwrap();
@@ -118,6 +166,7 @@ fn cli_rejects_multipage_tiff() {
     assert!(!output.exists(), "output file must not be created");
 }
 
+#[cfg(feature = "image")]
 #[test]
 fn cli_rejects_unsupported_destination_format_without_creating_output() {
     let dir = tempfile::tempdir().unwrap();
@@ -142,6 +191,7 @@ fn cli_rejects_unsupported_destination_format_without_creating_output() {
     assert!(!nested_dir.exists(), "directory must not be created");
 }
 
+#[cfg(feature = "image")]
 fn create_jpeg_with_exif_orientation(width: u32, height: u32, orientation: u8) -> Vec<u8> {
     let base = image::DynamicImage::new_rgb8(width, height);
     let mut base_jpeg = Vec::new();
@@ -169,6 +219,7 @@ fn create_jpeg_with_exif_orientation(width: u32, height: u32, orientation: u8) -
     output
 }
 
+#[cfg(feature = "image")]
 #[test]
 fn cli_inspects_orientation_and_normalizes_geometry() {
     let dir = tempfile::tempdir().unwrap();
@@ -211,6 +262,7 @@ fn cli_inspects_orientation_and_normalizes_geometry() {
     assert_eq!(data_out["properties"]["height"], 16);
 }
 
+#[cfg(feature = "image")]
 #[test]
 fn cli_rejects_transparency_for_jpeg_and_allows_opaque_alpha() {
     let dir = tempfile::tempdir().unwrap();
@@ -258,6 +310,7 @@ fn cli_rejects_transparency_for_jpeg_and_allows_opaque_alpha() {
     assert!(opaque_out.exists());
 }
 
+#[cfg(feature = "image")]
 #[test]
 fn cli_same_file_policy_and_alias_preservation() {
     let dir = tempfile::tempdir().unwrap();

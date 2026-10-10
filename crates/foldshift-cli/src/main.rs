@@ -1,7 +1,11 @@
+#[cfg(feature = "image")]
 use std::path::PathBuf;
 
 use anyhow::Result;
-use clap::{Args, Parser, Subcommand};
+#[cfg(feature = "image")]
+use clap::Args;
+use clap::{Parser, Subcommand};
+#[cfg(feature = "image")]
 use foldshift_image::EncodeOptions;
 
 #[derive(Debug, Parser)]
@@ -24,6 +28,7 @@ enum Command {
         json: bool,
     },
     /// Inspect a supported local file.
+    #[cfg(feature = "image")]
     Inspect {
         file: PathBuf,
         /// Emit machine-readable JSON.
@@ -31,20 +36,24 @@ enum Command {
         json: bool,
     },
     /// Convert an image based on the output extension.
+    #[cfg(feature = "image")]
     Convert(ConvertArgs),
     /// Image-specific operations.
+    #[cfg(feature = "image")]
     Image {
         #[command(subcommand)]
         command: ImageCommand,
     },
 }
 
+#[cfg(feature = "image")]
 #[derive(Debug, Subcommand)]
 enum ImageCommand {
     Convert(ConvertArgs),
     Resize(ResizeArgs),
 }
 
+#[cfg(feature = "image")]
 #[derive(Debug, Args)]
 struct ConvertArgs {
     input: PathBuf,
@@ -57,6 +66,7 @@ struct ConvertArgs {
     force: bool,
 }
 
+#[cfg(feature = "image")]
 #[derive(Debug, Args)]
 struct ResizeArgs {
     input: PathBuf,
@@ -86,11 +96,14 @@ fn run() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
         Command::Capabilities { json } => capabilities(json)?,
+        #[cfg(feature = "image")]
         Command::Inspect { file, json } => inspect(file, json)?,
+        #[cfg(feature = "image")]
         Command::Convert(args)
         | Command::Image {
             command: ImageCommand::Convert(args),
         } => convert(args)?,
+        #[cfg(feature = "image")]
         Command::Image {
             command: ImageCommand::Resize(args),
         } => resize(args)?,
@@ -99,17 +112,24 @@ fn run() -> Result<()> {
 }
 
 fn capabilities(json: bool) -> Result<()> {
-    let operations = foldshift_core::operations();
+    let is_image_available = cfg!(feature = "image");
+    let operations = foldshift_core::operations_with(|cap| match cap {
+        "image" => is_image_available,
+        _ => false,
+    });
     if json {
         println!("{}", serde_json::to_string_pretty(&operations)?);
         return Ok(());
     }
 
     println!("CORE   installed");
+    #[cfg(feature = "image")]
     println!(
         "IMAGE  installed ({})",
         foldshift_image::SUPPORTED_EXTENSIONS.join(", ")
     );
+    #[cfg(not(feature = "image"))]
+    println!("IMAGE  not installed (optional feature disabled)");
     println!("PDF    not installed (planned)");
     println!("MEDIA  not installed (planned)");
     println!();
@@ -120,6 +140,7 @@ fn capabilities(json: bool) -> Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "image")]
 fn inspect(file: PathBuf, json_output: bool) -> Result<()> {
     let inspection = foldshift_image::inspect(&file)?;
     if json_output {
@@ -135,6 +156,7 @@ fn inspect(file: PathBuf, json_output: bool) -> Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "image")]
 fn convert(args: ConvertArgs) -> Result<()> {
     foldshift_image::convert(
         &args.input,
@@ -152,6 +174,7 @@ fn convert(args: ConvertArgs) -> Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "image")]
 fn resize(args: ResizeArgs) -> Result<()> {
     let (width, height) = foldshift_image::resize(
         &args.input,
@@ -173,6 +196,7 @@ fn resize(args: ResizeArgs) -> Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "image")]
 fn title_case(value: &str) -> String {
     let mut characters = value.chars();
     match characters.next() {
@@ -181,6 +205,7 @@ fn title_case(value: &str) -> String {
     }
 }
 
+#[cfg(feature = "image")]
 fn plain_json(value: serde_json::Value) -> String {
     match value {
         serde_json::Value::String(value) => value,
