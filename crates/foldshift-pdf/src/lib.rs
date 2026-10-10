@@ -184,7 +184,8 @@ pub fn resolve_qpdf_engine() -> Result<PathBuf> {
     ))
 }
 
-/// Executes a qpdf subprocess with bounded execution limits and clean error handling.
+/// Executes a qpdf subprocess with bounded execution limits, pipe deadlock prevention,
+/// and clean error handling.
 pub fn run_qpdf(engine: &Path, args: &[String]) -> Result<String> {
     let mut cmd = Command::new(engine);
     cmd.args(args);
@@ -200,38 +201,43 @@ pub fn run_qpdf(engine: &Path, args: &[String]) -> Result<String> {
         ))
     })?;
 
+    // Drain stdout and stderr concurrently to prevent pipe buffer deadlocks
+    let stdout_pipe = child.stdout.take();
+    let stderr_pipe = child.stderr.take();
+
+    const MAX_OUTPUT_BYTES: u64 = 10 * 1024 * 1024; // 10 MB output safety cap
+
+    let stdout_reader = std::thread::spawn(move || {
+        let mut buf = Vec::new();
+        if let Some(pipe) = stdout_pipe {
+            let mut limited = pipe.take(MAX_OUTPUT_BYTES);
+            let _ = limited.read_to_end(&mut buf);
+        }
+        buf
+    });
+
+    let stderr_reader = std::thread::spawn(move || {
+        let mut buf = Vec::new();
+        if let Some(pipe) = stderr_pipe {
+            let mut limited = pipe.take(MAX_OUTPUT_BYTES);
+            let _ = limited.read_to_end(&mut buf);
+        }
+        buf
+    });
+
     // Wait for child process with 60s timeout guard
     let timeout = Duration::from_secs(60);
     let start = std::time::Instant::now();
 
-    loop {
+    let status = loop {
         match child.try_wait() {
-            Ok(Some(status)) => {
-                let output = child.wait_with_output().map_err(FcError::Io)?;
-                let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-                let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-
-                if status.success() {
-                    return Ok(stdout);
-                }
-
-                // Handle known error conditions
-                let stderr_trimmed = stderr.trim();
-                if stderr_trimmed.contains("password") {
-                    return Err(FcError::Conversion(
-                        "PDF document is password-protected or encrypted".into(),
-                    ));
-                }
-                return Err(FcError::Conversion(format!(
-                    "qpdf engine failed (exit code {:?}): {}",
-                    status.code(),
-                    stderr_trimmed
-                )));
-            }
+            Ok(Some(status)) => break status,
             Ok(None) => {
                 if start.elapsed() > timeout {
                     let _ = child.kill();
                     let _ = child.wait();
+                    let _ = stdout_reader.join();
+                    let _ = stderr_reader.join();
                     return Err(FcError::Conversion(format!(
                         "qpdf engine timed out after {}s",
                         timeout.as_secs()
@@ -239,9 +245,38 @@ pub fn run_qpdf(engine: &Path, args: &[String]) -> Result<String> {
                 }
                 std::thread::sleep(Duration::from_millis(20));
             }
-            Err(e) => return Err(FcError::Io(e)),
+            Err(e) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                let _ = stdout_reader.join();
+                let _ = stderr_reader.join();
+                return Err(FcError::Io(e));
+            }
         }
+    };
+
+    let stdout_bytes = stdout_reader.join().unwrap_or_default();
+    let stderr_bytes = stderr_reader.join().unwrap_or_default();
+
+    let stdout = String::from_utf8_lossy(&stdout_bytes).to_string();
+    let stderr = String::from_utf8_lossy(&stderr_bytes).to_string();
+
+    if status.success() {
+        return Ok(stdout);
     }
+
+    // Handle known error conditions
+    let stderr_trimmed = stderr.trim();
+    if stderr_trimmed.contains("password") {
+        return Err(FcError::Conversion(
+            "PDF document is password-protected or encrypted".into(),
+        ));
+    }
+    Err(FcError::Conversion(format!(
+        "qpdf engine failed (exit code {:?}): {}",
+        status.code(),
+        stderr_trimmed
+    )))
 }
 
 /// Inspects a PDF file's page count, version, and properties.

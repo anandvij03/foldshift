@@ -18,6 +18,8 @@
       --accent-subtle: rgba(59, 130, 246, 0.12);
       --success: #10b981;
       --success-subtle: rgba(16, 185, 129, 0.12);
+      --warning: #f59e0b;
+      --warning-subtle: rgba(245, 158, 11, 0.12);
       --error: #ef4444;
       --error-subtle: rgba(239, 68, 68, 0.12);
       --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
@@ -42,17 +44,16 @@
       -webkit-font-smoothing: antialiased;
     }
 
-    /* Container */
     .container {
       width: 100%;
-      max-width: 760px;
+      max-width: 780px;
       margin: 0 auto;
       padding: 32px 20px 48px;
     }
 
     /* Header */
     header {
-      margin-bottom: 28px;
+      margin-bottom: 24px;
     }
 
     .brand-row {
@@ -116,7 +117,7 @@
       border-radius: 8px;
       padding: 3px;
       gap: 3px;
-      margin-bottom: 24px;
+      margin-bottom: 20px;
     }
 
     .tab-btn {
@@ -124,7 +125,7 @@
       background: transparent;
       border: none;
       color: var(--text-muted);
-      padding: 8px 12px;
+      padding: 8px 10px;
       font-size: 13px;
       font-weight: 500;
       border-radius: 6px;
@@ -143,7 +144,7 @@
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
     }
 
-    /* Common Card */
+    /* Card */
     .card {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -157,7 +158,7 @@
       border: 1.5px dashed var(--border);
       background: var(--surface-2);
       border-radius: 8px;
-      padding: 32px 20px;
+      padding: 30px 20px;
       text-align: center;
       cursor: pointer;
       transition: all 0.15s ease;
@@ -180,7 +181,7 @@
 
     .dropzone-icon {
       font-size: 24px;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
       color: var(--text-muted);
     }
 
@@ -195,7 +196,7 @@
       font-family: var(--font-mono);
     }
 
-    /* Selected File Bar */
+    /* File Bar */
     .file-bar {
       display: none;
       align-items: center;
@@ -222,6 +223,13 @@
       background: #000;
       border: 1px solid var(--border);
       flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
     }
 
     .file-meta {
@@ -234,7 +242,7 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      max-width: 400px;
+      max-width: 450px;
     }
 
     .file-specs {
@@ -259,6 +267,37 @@
       border-color: var(--border-focus);
     }
 
+    /* Sub Tabs (for PDF Tools) */
+    .subtabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+
+    .subtab-btn {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 6px 14px;
+      font-size: 12px;
+      font-weight: 500;
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s ease;
+    }
+
+    .subtab-btn:hover {
+      color: var(--text);
+      border-color: var(--border-focus);
+    }
+
+    .subtab-btn.active {
+      border-color: var(--accent);
+      background: var(--accent-subtle);
+      color: #fff;
+    }
+
     /* Form Controls */
     .form-group {
       margin-bottom: 18px;
@@ -266,7 +305,7 @@
 
     .form-label {
       display: block;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 600;
       color: var(--text-muted);
       text-transform: uppercase;
@@ -362,7 +401,50 @@
       margin-top: 6px;
     }
 
-    /* Primary Action Button */
+    /* List for multiple files (PDF Merge) */
+    .file-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 16px;
+      max-height: 220px;
+      overflow-y: auto;
+    }
+
+    .file-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 12px;
+    }
+
+    .file-item-name {
+      font-family: var(--font-mono);
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 500px;
+    }
+
+    .file-item-remove {
+      color: var(--text-muted);
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 2px 6px;
+    }
+
+    .file-item-remove:hover {
+      color: var(--error);
+    }
+
+    /* Action Buttons */
     .btn-action {
       display: flex;
       align-items: center;
@@ -413,6 +495,13 @@
       color: #86efac;
     }
 
+    .msg-box.warning {
+      display: block;
+      background: var(--warning-subtle);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      color: #fde68a;
+    }
+
     /* Inspection Spec Grid */
     .spec-grid {
       display: grid;
@@ -450,12 +539,12 @@
       word-break: break-all;
     }
 
-    /* Capabilities Table */
+    /* Capabilities & Packs */
     .cap-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
       gap: 12px;
-      margin-bottom: 20px;
+      margin-bottom: 24px;
     }
 
     @media (max-width: 500px) {
@@ -492,6 +581,15 @@
       border-radius: 4px;
     }
 
+    .badge-warning {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--warning);
+      background: var(--warning-subtle);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
     .badge-planned {
       font-family: var(--font-mono);
       font-size: 10px;
@@ -511,6 +609,7 @@
       border-collapse: collapse;
       font-size: 12px;
       margin-top: 10px;
+      margin-bottom: 24px;
     }
 
     .ops-table th {
@@ -548,7 +647,6 @@
       border-top: 1px solid var(--border);
     }
 
-    /* Tab Panels */
     .tab-panel {
       display: none;
     }
@@ -594,24 +692,25 @@
     <nav class="tabs">
       <button class="tab-btn active" data-tab="tab-convert">Convert</button>
       <button class="tab-btn" data-tab="tab-resize">Resize</button>
+      <button class="tab-btn" data-tab="tab-pdf">PDF Tools</button>
       <button class="tab-btn" data-tab="tab-inspect">Inspect</button>
-      <button class="tab-btn" data-tab="tab-system">Status & Capabilities</button>
+      <button class="tab-btn" data-tab="tab-system">Status & Packs</button>
     </nav>
 
-    <!-- Global Upload Area (Used by Convert, Resize, Inspect) -->
+    <!-- Shared Upload Area (Convert, Resize, Inspect) -->
     <div id="upload-section">
       <div class="dropzone" id="dropzone">
-        <input type="file" id="file-input" accept="image/*,.png,.jpg,.jpeg,.webp,.gif,.bmp,.tif,.tiff">
+        <input type="file" id="file-input" accept="image/*,.png,.jpg,.jpeg,.webp,.gif,.bmp,.tif,.tiff,.pdf">
         <div class="dropzone-icon">⤓</div>
-        <div class="dropzone-title">Drop an image here or click to choose</div>
-        <div class="dropzone-hint">Supported: PNG, JPEG, WebP, GIF, BMP, TIFF (Max 100MB)</div>
+        <div class="dropzone-title">Drop an image or PDF here, or click to choose</div>
+        <div class="dropzone-hint">Images: PNG, JPEG, WebP, GIF, BMP, TIFF &bull; Documents: PDF (Max 100MB)</div>
       </div>
 
       <div class="file-bar" id="file-bar">
         <div class="file-info">
-          <img class="file-thumb" id="file-preview" alt="Preview">
+          <div class="file-thumb" id="file-preview">FILE</div>
           <div class="file-meta">
-            <div class="file-name" id="file-name">filename.png</div>
+            <div class="file-name" id="file-name">filename.ext</div>
             <div class="file-specs" id="file-specs">0 KB</div>
           </div>
         </div>
@@ -619,7 +718,7 @@
       </div>
     </div>
 
-    <!-- TAB 1: CONVERT -->
+    <!-- TAB 1: CONVERT (IMAGE) -->
     <main class="tab-panel active" id="tab-convert">
       <div class="card">
         <div class="form-group">
@@ -651,7 +750,7 @@
       </div>
     </main>
 
-    <!-- TAB 2: RESIZE -->
+    <!-- TAB 2: RESIZE (IMAGE) -->
     <main class="tab-panel" id="tab-resize">
       <div class="card">
         <div class="form-group">
@@ -696,11 +795,55 @@
       </div>
     </main>
 
-    <!-- TAB 3: INSPECT -->
+    <!-- TAB 3: PDF TOOLS (MERGE & EXTRACT) -->
+    <main class="tab-panel" id="tab-pdf">
+      <div class="card">
+        <div class="subtabs">
+          <button type="button" class="subtab-btn active" id="subtab-pdf-merge-btn">Merge PDFs</button>
+          <button type="button" class="subtab-btn" id="subtab-pdf-extract-btn">Extract Pages</button>
+        </div>
+
+        <!-- PDF Merge Section -->
+        <div id="pdf-merge-section">
+          <div class="form-group">
+            <label class="form-label">Upload PDFs to Merge</label>
+            <div class="dropzone" id="pdf-merge-dropzone" style="padding: 20px;">
+              <input type="file" id="pdf-merge-input" accept=".pdf,application/pdf" multiple>
+              <div class="dropzone-icon" style="font-size: 20px;">+</div>
+              <div class="dropzone-title" style="font-size: 13px;">Add PDF files (ordered)</div>
+              <div class="dropzone-hint">Select multiple documents to combine into a single PDF</div>
+            </div>
+          </div>
+
+          <div class="file-list" id="pdf-merge-list"></div>
+
+          <button class="btn-action" id="btn-pdf-merge-run" disabled>
+            <span>Merge & Download</span>
+          </button>
+          <div class="msg-box" id="pdf-merge-msg"></div>
+        </div>
+
+        <!-- PDF Extract Section -->
+        <div id="pdf-extract-section" style="display: none;">
+          <div class="form-group">
+            <label class="form-label">Page Selection</label>
+            <input type="text" class="text-input" id="pdf-extract-pages" placeholder="e.g. 1-3, 5, 8-10">
+            <div class="form-hint">Specify individual pages or ranges separated by commas (e.g. <code>1-3, 5</code>).</div>
+          </div>
+
+          <button class="btn-action" id="btn-pdf-extract-run" disabled>
+            <span>Extract & Download</span>
+          </button>
+          <div class="msg-box" id="pdf-extract-msg"></div>
+        </div>
+      </div>
+    </main>
+
+    <!-- TAB 4: INSPECT -->
     <main class="tab-panel" id="tab-inspect">
       <div class="card">
         <div id="inspect-empty" style="text-align: center; color: var(--text-muted); padding: 20px 0;">
-          Select an image above to inspect metadata, geometry, and color profile.
+          Select or drop a file above to inspect geometry, page count, and metadata properties.
         </div>
 
         <div id="inspect-result" style="display: none;">
@@ -714,42 +857,57 @@
       </div>
     </main>
 
-    <!-- TAB 4: SYSTEM & CAPABILITIES -->
+    <!-- TAB 5: STATUS & PACKS -->
     <main class="tab-panel" id="tab-system">
       <div class="card">
         <div class="form-label" style="margin-bottom: 12px;">Engines & Capabilities</div>
         <div class="cap-grid">
-          <div class="cap-box">
+          <div class="cap-box" id="cap-box-core">
             <div class="cap-header">
               <span class="cap-name">CORE Engine</span>
               <span class="badge-installed">Installed</span>
             </div>
             <div class="cap-desc">Job execution, safe tempfile swapping, atomic pipeline</div>
           </div>
-          <div class="cap-box">
+          <div class="cap-box" id="cap-box-image">
             <div class="cap-header">
               <span class="cap-name">IMAGE Engine</span>
               <span class="badge-installed">Installed</span>
             </div>
-            <div class="cap-desc">PNG, JPEG, WebP, GIF, BMP, TIFF (EXIF upright decode)</div>
+            <div class="cap-desc">PNG, JPEG, WebP, GIF, BMP, TIFF (pure Rust codecs)</div>
           </div>
-          <div class="cap-box">
+          <div class="cap-box" id="cap-box-pdf">
             <div class="cap-header">
-              <span class="cap-name">PDF Engine</span>
-              <span class="badge-planned">Planned M3</span>
+              <span class="cap-name">PDF Engine (qpdf)</span>
+              <span class="badge-planned" id="badge-pdf">Checking...</span>
             </div>
-            <div class="cap-desc">qpdf adapter: inspect, merge, extract pages</div>
+            <div class="cap-desc" id="desc-pdf">Inspecting, merging, and page extraction</div>
           </div>
-          <div class="cap-box">
+          <div class="cap-box" id="cap-box-media">
             <div class="cap-header">
               <span class="cap-name">MEDIA Engine</span>
               <span class="badge-planned">Planned M4</span>
             </div>
-            <div class="cap-desc">FFmpeg adapter: audio stream conversion, video operations</div>
+            <div class="cap-desc">Audio/video stream operations (FFmpeg pack)</div>
           </div>
         </div>
 
-        <div class="form-label" style="margin-top: 24px; margin-bottom: 8px;">Registered Operations Matrix</div>
+        <div class="form-label" style="margin-top: 10px; margin-bottom: 8px;">Installed Capability Packs</div>
+        <table class="ops-table">
+          <thead>
+            <tr>
+              <th>Capability</th>
+              <th>Pack ID</th>
+              <th>Version</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="packs-table-body">
+            <tr><td colspan="4" style="color: var(--text-muted);">Querying packs...</td></tr>
+          </tbody>
+        </table>
+
+        <div class="form-label" style="margin-top: 10px; margin-bottom: 8px;">Registered Operations Matrix</div>
         <table class="ops-table">
           <thead>
             <tr>
@@ -775,6 +933,7 @@
     let currentFile = null;
     let selectedConvertFormat = 'webp';
     let selectedResizeFormat = '';
+    let pdfMergeFiles = [];
 
     // Elements
     const dropzone = document.getElementById('dropzone');
@@ -797,11 +956,31 @@
         const target = document.getElementById(btn.dataset.tab);
         if (target) target.classList.add('active');
 
-        // If inspecting tab clicked and file present, re-run inspection if needed
         if (btn.dataset.tab === 'tab-inspect' && currentFile) {
           inspectFile(currentFile);
         }
       });
+    });
+
+    // Subtabs (PDF Merge / Extract)
+    const subtabMergeBtn = document.getElementById('subtab-pdf-merge-btn');
+    const subtabExtractBtn = document.getElementById('subtab-pdf-extract-btn');
+    const pdfMergeSection = document.getElementById('pdf-merge-section');
+    const pdfExtractSection = document.getElementById('pdf-extract-section');
+
+    subtabMergeBtn.addEventListener('click', () => {
+      subtabMergeBtn.classList.add('active');
+      subtabExtractBtn.classList.remove('active');
+      pdfMergeSection.style.display = 'block';
+      pdfExtractSection.style.display = 'none';
+    });
+
+    subtabExtractBtn.addEventListener('click', () => {
+      subtabExtractBtn.classList.add('active');
+      subtabMergeBtn.classList.remove('active');
+      pdfMergeSection.style.display = 'none';
+      pdfExtractSection.style.display = 'block';
+      updatePdfExtractButton();
     });
 
     // File Handling
@@ -809,40 +988,65 @@
       if (!file) return;
       currentFile = file;
 
-      // Update UI bar
       fileNameEl.textContent = file.name;
       fileSpecsEl.textContent = formatBytes(file.size);
-      
-      if (file.type.startsWith('image/')) {
+
+      const isPdf = file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf';
+
+      if (isPdf) {
+        filePreview.textContent = 'PDF';
+        filePreview.style.backgroundImage = 'none';
+      } else if (file.type.startsWith('image/')) {
         const reader = new FileReader();
-        reader.onload = e => { filePreview.src = e.target.result; };
+        reader.onload = e => {
+          filePreview.textContent = '';
+          filePreview.style.backgroundImage = `url("${e.target.result}")`;
+          filePreview.style.backgroundSize = 'cover';
+        };
         reader.readAsDataURL(file);
       } else {
-        filePreview.src = '';
+        filePreview.textContent = 'FILE';
+        filePreview.style.backgroundImage = 'none';
       }
 
       dropzone.style.display = 'none';
       fileBar.style.display = 'flex';
 
-      document.getElementById('btn-convert-run').disabled = false;
-      document.getElementById('btn-resize-run').disabled = false;
+      // Update button states
+      document.getElementById('btn-convert-run').disabled = isPdf;
+      document.getElementById('btn-resize-run').disabled = isPdf;
+      updatePdfExtractButton();
 
       // Trigger instant inspect
       inspectFile(file);
     }
+
+    function updatePdfExtractButton() {
+      const isPdf = currentFile && (currentFile.name.toLowerCase().endsWith('.pdf') || currentFile.type === 'application/pdf');
+      const pages = document.getElementById('pdf-extract-pages').value.trim();
+      document.getElementById('btn-pdf-extract-run').disabled = !(isPdf && pages.length > 0);
+    }
+
+    document.getElementById('pdf-extract-pages').addEventListener('input', updatePdfExtractButton);
 
     function clearFile() {
       currentFile = null;
       fileInput.value = '';
       dropzone.style.display = 'block';
       fileBar.style.display = 'none';
+      filePreview.textContent = 'FILE';
+      filePreview.style.backgroundImage = 'none';
+
       document.getElementById('btn-convert-run').disabled = true;
       document.getElementById('btn-resize-run').disabled = true;
+      document.getElementById('btn-pdf-extract-run').disabled = true;
       document.getElementById('inspect-result').style.display = 'none';
       document.getElementById('inspect-empty').style.display = 'block';
+
       hideMsg('convert-msg');
       hideMsg('resize-msg');
       hideMsg('inspect-msg');
+      hideMsg('pdf-extract-msg');
     }
 
     fileInput.addEventListener('change', (e) => {
@@ -851,7 +1055,7 @@
 
     btnClear.addEventListener('click', clearFile);
 
-    // Drag and Drop
+    // Drag and Drop for main dropzone
     ['dragenter', 'dragover'].forEach(name => {
       dropzone.addEventListener(name, (e) => {
         e.preventDefault();
@@ -870,6 +1074,43 @@
       if (e.dataTransfer.files.length) {
         handleSelectedFile(e.dataTransfer.files[0]);
       }
+    });
+
+    // PDF Merge Multiple Files Handling
+    const pdfMergeInput = document.getElementById('pdf-merge-input');
+    const pdfMergeDropzone = document.getElementById('pdf-merge-dropzone');
+    const pdfMergeList = document.getElementById('pdf-merge-list');
+    const btnPdfMergeRun = document.getElementById('btn-pdf-merge-run');
+
+    function renderPdfMergeList() {
+      pdfMergeList.innerHTML = '';
+      pdfMergeFiles.forEach((f, idx) => {
+        const item = document.createElement('div');
+        item.className = 'file-item';
+        item.innerHTML = `
+          <span class="file-item-name">${idx + 1}. ${f.name} (${formatBytes(f.size)})</span>
+          <button type="button" class="file-item-remove" data-idx="${idx}">&times;</button>
+        `;
+        pdfMergeList.appendChild(item);
+      });
+
+      pdfMergeList.querySelectorAll('.file-item-remove').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const idx = parseInt(e.target.dataset.idx, 10);
+          pdfMergeFiles.splice(idx, 1);
+          renderPdfMergeList();
+        });
+      });
+
+      btnPdfMergeRun.disabled = pdfMergeFiles.length < 2;
+    }
+
+    pdfMergeInput.addEventListener('change', (e) => {
+      for (const f of e.target.files) {
+        pdfMergeFiles.push(f);
+      }
+      renderPdfMergeList();
+      pdfMergeInput.value = '';
     });
 
     // Format buttons for Convert
@@ -905,7 +1146,7 @@
 
     // Helpers
     function formatBytes(bytes) {
-      if (bytes === 0) return '0 Bytes';
+      if (!bytes || bytes === 0) return '0 Bytes';
       const k = 1024;
       const sizes = ['Bytes', 'KB', 'MB', 'GB'];
       const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -945,13 +1186,33 @@
         specGrid.innerHTML = '';
 
         const items = [
-          { key: 'File Format', val: data.format },
-          { key: 'Dimensions', val: `${data.properties.width} × ${data.properties.height} px` },
-          { key: 'Color Type', val: data.properties.color || 'Unknown' },
-          { key: 'Orientation', val: data.properties.orientation || 'NoTransforms' },
+          { key: 'Format', val: data.format },
+          { key: 'Media Kind', val: data.media_kind },
           { key: 'File Size', val: `${formatBytes(data.bytes)} (${data.bytes.toLocaleString()} bytes)` },
-          { key: 'Media Kind', val: data.media_kind }
         ];
+
+        if (data.properties.page_count !== undefined) {
+          items.push({ key: 'Page Count', val: `${data.properties.page_count} pages` });
+        }
+        if (data.properties.pdf_version) {
+          items.push({ key: 'PDF Version', val: data.properties.pdf_version });
+        }
+        if (data.properties.width !== undefined && data.properties.height !== undefined) {
+          items.push({ key: 'Dimensions', val: `${data.properties.width} × ${data.properties.height} px` });
+        }
+        if (data.properties.color) {
+          items.push({ key: 'Color Type', val: data.properties.color });
+        }
+        if (data.properties.orientation) {
+          items.push({ key: 'Orientation', val: data.properties.orientation });
+        }
+
+        // Add any other properties
+        for (const [k, v] of Object.entries(data.properties)) {
+          if (!['page_count', 'pdf_version', 'width', 'height', 'color', 'orientation'].includes(k)) {
+            items.push({ key: k, val: JSON.stringify(v) });
+          }
+        }
 
         items.forEach(item => {
           const div = document.createElement('div');
@@ -1068,35 +1329,170 @@
       }
     });
 
-    // Fetch Capabilities on load
-    async function loadCapabilities() {
-      try {
-        const res = await fetch('/api/capabilities');
-        if (!res.ok) return;
-        const data = await res.json();
-        
-        document.getElementById('version-badge').textContent = 'v' + data.version;
+    // PDF Merge Action
+    btnPdfMergeRun.addEventListener('click', async () => {
+      if (pdfMergeFiles.length < 2) return;
+      hideMsg('pdf-merge-msg');
+      btnPdfMergeRun.disabled = true;
+      btnPdfMergeRun.innerHTML = '<span class="spinner"></span> <span>Merging PDFs locally...</span>';
 
-        const tableBody = document.getElementById('ops-table-body');
-        tableBody.innerHTML = '';
-        data.capabilities.forEach(op => {
-          const tr = document.createElement('tr');
-          const statusBadge = op.available 
-            ? '<span class="badge-installed">available</span>' 
-            : '<span class="badge-planned">planned</span>';
-          tr.innerHTML = `
-            <td class="ops-id">${op.id}</td>
-            <td>${op.summary}</td>
-            <td>${statusBadge}</td>
-          `;
-          tableBody.appendChild(tr);
-        });
+      const formData = new FormData();
+      pdfMergeFiles.forEach(f => {
+        formData.append('files', f);
+      });
+
+      try {
+        const res = await fetch('/api/pdf/merge', { method: 'POST', body: formData });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({ error: 'PDF merge failed' }));
+          showMsg('pdf-merge-msg', 'error', errData.error || 'PDF merge failed');
+        } else {
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'merged.pdf';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+
+          showMsg('pdf-merge-msg', 'success', `Saved merged.pdf (${formatBytes(blob.size)})`);
+        }
+      } catch (err) {
+        showMsg('pdf-merge-msg', 'error', 'Error: ' + err.message);
+      } finally {
+        btnPdfMergeRun.disabled = false;
+        btnPdfMergeRun.innerHTML = '<span>Merge & Download</span>';
+      }
+    });
+
+    // PDF Extract Action
+    const btnPdfExtractRun = document.getElementById('btn-pdf-extract-run');
+    btnPdfExtractRun.addEventListener('click', async () => {
+      if (!currentFile) return;
+      const pages = document.getElementById('pdf-extract-pages').value.trim();
+      if (!pages) {
+        showMsg('pdf-extract-msg', 'error', 'Please specify pages to extract (e.g. 1-3, 5)');
+        return;
+      }
+
+      hideMsg('pdf-extract-msg');
+      btnPdfExtractRun.disabled = true;
+      btnPdfExtractRun.innerHTML = '<span class="spinner"></span> <span>Extracting pages...</span>';
+
+      const formData = new FormData();
+      formData.append('file', currentFile);
+      formData.append('pages', pages);
+
+      try {
+        const res = await fetch('/api/pdf/extract', { method: 'POST', body: formData });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({ error: 'PDF extract failed' }));
+          showMsg('pdf-extract-msg', 'error', errData.error || 'PDF extract failed');
+        } else {
+          const blob = await res.blob();
+          const disp = res.headers.get('content-disposition');
+          let downloadName = 'extracted.pdf';
+          if (disp && disp.includes('filename=')) {
+            const match = disp.match(/filename="?([^"]+)"?/);
+            if (match && match[1]) downloadName = match[1];
+          }
+
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = downloadName;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+
+          showMsg('pdf-extract-msg', 'success', `Saved ${downloadName} (${formatBytes(blob.size)})`);
+        }
+      } catch (err) {
+        showMsg('pdf-extract-msg', 'error', 'Error: ' + err.message);
+      } finally {
+        btnPdfExtractRun.disabled = false;
+        btnPdfExtractRun.innerHTML = '<span>Extract & Download</span>';
+      }
+    });
+
+    // Fetch Capabilities and Packs on load
+    async function loadCapabilitiesAndPacks() {
+      try {
+        const [capRes, packsRes] = await Promise.all([
+          fetch('/api/capabilities'),
+          fetch('/api/packs')
+        ]);
+
+        if (capRes.ok) {
+          const capData = await capRes.json();
+          document.getElementById('version-badge').textContent = 'v' + capData.version;
+
+          const tableBody = document.getElementById('ops-table-body');
+          tableBody.innerHTML = '';
+          capData.capabilities.forEach(op => {
+            const tr = document.createElement('tr');
+            const statusBadge = op.available 
+              ? '<span class="badge-installed">available</span>' 
+              : '<span class="badge-planned">unavailable</span>';
+            tr.innerHTML = `
+              <td class="ops-id">${op.id}</td>
+              <td>${op.summary}</td>
+              <td>${statusBadge}</td>
+            `;
+            tableBody.appendChild(tr);
+          });
+        }
+
+        if (packsRes.ok) {
+          const packsData = await packsRes.json();
+          const packsTableBody = document.getElementById('packs-table-body');
+          packsTableBody.innerHTML = '';
+
+          let pdfInstalled = false;
+
+          packsData.forEach(p => {
+            if (p.capability === 'pdf' && p.installed && p.healthy) {
+              pdfInstalled = true;
+            }
+
+            const tr = document.createElement('tr');
+            let badge = '<span class="badge-planned">not installed</span>';
+            if (p.installed && p.healthy) {
+              badge = '<span class="badge-installed">installed & healthy</span>';
+            } else if (p.installed && !p.healthy) {
+              badge = '<span class="badge-warning">unhealthy</span>';
+            }
+
+            tr.innerHTML = `
+              <td>${p.capability.toUpperCase()}</td>
+              <td class="ops-id">${p.id}</td>
+              <td>${p.version || '&mdash;'}</td>
+              <td>${badge}</td>
+            `;
+            packsTableBody.appendChild(tr);
+          });
+
+          const badgePdf = document.getElementById('badge-pdf');
+          const descPdf = document.getElementById('desc-pdf');
+          if (pdfInstalled) {
+            badgePdf.className = 'badge-installed';
+            badgePdf.textContent = 'Installed';
+            descPdf.textContent = 'qpdf adapter ready for inspect, merge, and extract';
+          } else {
+            badgePdf.className = 'badge-planned';
+            badgePdf.textContent = 'Requires Pack';
+            descPdf.textContent = 'Install qpdf pack via CLI (`foldshift pack install`) or system PATH';
+          }
+        }
       } catch (e) {
-        console.error('Failed to load capabilities', e);
+        console.error('Failed to load capabilities or packs', e);
       }
     }
 
-    loadCapabilities();
+    loadCapabilitiesAndPacks();
   </script>
 </body>
 </html>

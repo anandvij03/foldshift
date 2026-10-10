@@ -60,3 +60,30 @@ direction. Separate blockers from optional cleanup. Record the exact revision,
 checks/results, untested platforms and outstanding limitations. After cleanup,
 review the combined diff and repeat relevant checks. The maintainer merges and
 publishes.
+
+---
+
+## Milestone 3 Review & Audit (FS-023)
+
+Audit date: 10 October 2026  
+Reviewed commits: `92c5ddb` (FS-020), `ee0b66c` (FS-021), `522791f` (FS-022)  
+
+### Findings and Dispositions
+
+1. **Subprocess Pipe Buffer Deadlock Risk in `run_qpdf`**:
+   - **Trigger**: Child process generating stdout or stderr exceeding OS pipe buffer limits (4KB–64KB) while parent process polls `child.try_wait()`.
+   - **Consequence**: Child blocks on `write()`, parent waits in loop until 60s timeout, causing hang and false failure.
+   - **Remediation**: Replaced sequential wait with dual concurrent worker threads draining `stdout` and `stderr` streams in the background as the process writes. Added 10 MB per-stream safety cap (`MAX_OUTPUT_BYTES`) to prevent memory exhaustion from output bombs.
+
+2. **Atomic Recovery and Interrupted Update Semantics**:
+   - **Verified**: Staging directory isolation (`.staging`) ensures broken or aborted pack installations and updates never touch existing destination directories or active records in `installed.json`.
+   - **Verified**: Atomic `persist()` in `foldshift-pdf` guarantees original input files and destinations are never truncated or modified if `qpdf` exits with an error or is terminated.
+
+3. **Platform Sandbox Boundary Truth**:
+   - **Audit**: Confirmed that FoldShift does not advertise kernel-level sandboxing on any platform.
+   - **Documentation**: Documented platform execution contexts and boundaries in `docs/PROCESS-LIMITS-AND-LICENSES.md`.
+
+4. **Third-Party License Governance**:
+   - **Audit**: Verified that QPDF is governed by the Apache 2.0 license, and that pack manifests mandate `license` and `notice` tracking.
+   - **Documentation**: Recorded license obligations in `docs/PROCESS-LIMITS-AND-LICENSES.md`.
+
