@@ -22,26 +22,28 @@ Only shipped options are installable. Planned features may appear as roadmap
 information, not install buttons. Start with a README download table; a service
 is not required.
 
-## Phase A: two build profiles
+## Phase A: two build profiles (implemented)
 
-First implement Core (without images) and Images (Core plus images, the initial
-recommended download). Proposed commands after FS-010:
+Implemented under FS-010 and FS-011: Core (without images) and Images (Core plus
+images, the recommended download), packaged with distribution manifests via
+`tools/package_artifacts.ps1`:
 
 ```sh
 cargo build -p foldshift-cli --release --no-default-features
 cargo build -p foldshift-cli --release --no-default-features --features images
+powershell -ExecutionPolicy Bypass -File tools/package_artifacts.ps1
 ```
 
-Make the CLI image dependency optional and gate help, dispatch, registration and
-tests consistently. Use one feature-based source of truth for available
-operations. CI must exercise each profile; workspace tests alone do not prove
-minimality. Inspect the package-targeted dependency graph to show that Core has
-no image codecs, distinguishing runtime and development dependencies.
+The CLI image dependency is optional and gates help, dispatch, registration, and
+tests consistently. Capability discovery derives directly from compiled features
+via `foldshift_core::operations_with`. The package-targeted dependency graph for Core
+contains no image codecs. Measured artifact sizes, archive hashes, and license
+terms are published in `dist/manifest.json` and the README download chooser table.
 
 Images are linked into the executable at this stage, not installed as a plugin.
 Changing profiles replaces the executable with another tested build. Unchecking
-a box cannot unload linked code or shrink an existing binary. Start with two
-artifacts per supported platform, avoiding every possible codec combination.
+a box cannot unload linked code or shrink an existing binary. Initial release
+publishes tested artifacts for supported platforms.
 
 ## Phase B: optional engine packs
 

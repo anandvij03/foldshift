@@ -31,15 +31,25 @@ and a graphical interface are planned. No public release has been published yet.
 PDF, audio/video, AVIF/HEIC, the desktop UI, engine installation, sandboxing,
 and self-updates are roadmap items, not current features.
 
-## Build
+## Build profiles and packaging
 
-Install Rust 1.88 or newer (current stable recommended), then run:
+Install Rust 1.88 or newer (current stable recommended). Foldshift supports modular compilation profiles:
 
 ```bash
-cargo build --release --locked
+# 1. Images profile (recommended: Core + pure-Rust image capability, ~1.92 MB)
+cargo build -p foldshift-cli --release --features image --locked
+
+# 2. Core-only profile (lightweight base CLI without image codecs, ~462 KiB)
+cargo build -p foldshift-cli --release --no-default-features --locked
+
+# 3. Web UI profile (local HTTP server + embedded single-page client, ~2.75 MB)
+cargo build -p foldshift-web --release --locked
+
+# 4. Package distribution archives and generate manifest.json
+powershell -ExecutionPolicy Bypass -File tools/package_artifacts.ps1
 ```
 
-The executable is `target/release/foldshift` (`foldshift.exe` on Windows). In PowerShell,
+The executable is located in `target/release/foldshift` (`foldshift.exe` on Windows). In PowerShell,
 invoke it as `.\foldshift.exe` from the folder containing the executable.
 
 ## Usage

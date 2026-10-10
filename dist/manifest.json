@@ -1,0 +1,63 @@
+{
+  "schema_version": "1.0.0",
+  "foldshift_version": "0.1.0",
+  "generated_at": "2026-10-10T15:04:51Z",
+  "platform": {
+    "os": "windows",
+    "arch": "x86_64",
+    "target_triple": "x86_64-pc-windows-msvc"
+  },
+  "artifacts": [
+    {
+      "id": "core",
+      "name": "Foldshift Core",
+      "description": "Minimal base CLI without conversion codecs; capability discovery and inspection contracts",
+      "profile": "core",
+      "capabilities": [
+        "core"
+      ],
+      "archive_filename": "foldshift-core-0.1.0-windows-x86_64.zip",
+      "download_bytes": 223818,
+      "download_sha256": "b2e57086e11b532f099ce67e1c77e6505ad9a6bde0ed0bf591f1186c36b773a6",
+      "installed_bytes": 473600,
+      "binary_filename": "foldshift.exe",
+      "binary_sha256": "c9eb0f9d1996bebacde2d754117454061c8daee170bdd8f2bb86b2de64d98f6b",
+      "notices": "MIT License. Permissive dependencies: clap, anyhow, serde_json, foldshift-core."
+    },
+    {
+      "id": "images",
+      "name": "Foldshift Images",
+      "description": "Core CLI plus still-image inspection, conversion, and resize (PNG, JPEG, WebP, GIF, BMP, TIFF)",
+      "profile": "images",
+      "capabilities": [
+        "core",
+        "image"
+      ],
+      "archive_filename": "foldshift-images-0.1.0-windows-x86_64.zip",
+      "download_bytes": 900641,
+      "download_sha256": "76d4329528a14a3d701ead8b435277701265e2dd7666f6503fcba1b8d0b8064b",
+      "installed_bytes": 2016256,
+      "binary_filename": "foldshift.exe",
+      "binary_sha256": "3194863d0ce86dc3b60b8f490d0a4ecc641e3ecef9f55d6e3c4005230b428e4a",
+      "notices": "MIT License. Permissive dependencies: image, gif, tiff, png, clap, anyhow, serde_json."
+    },
+    {
+      "id": "web",
+      "name": "Foldshift Web",
+      "description": "Local browser UI and HTTP API server with embedded single-page client",
+      "profile": "web",
+      "capabilities": [
+        "core",
+        "image",
+        "web"
+      ],
+      "archive_filename": "foldshift-web-0.1.0-windows-x86_64.zip",
+      "download_bytes": 1374819,
+      "download_sha256": "afb7cc5e0e9180ffea3b2aeaa592488862fb5dd73782b3aa1cef2b01fc06e7f5",
+      "installed_bytes": 2890752,
+      "binary_filename": "foldshift-web.exe",
+      "binary_sha256": "3cdbb3a1d23bbfa7b13d98381df89c89267c7691690e772c16515a6ebf483a08",
+      "notices": "MIT License. Permissive dependencies: axum, tokio, image, gif, tiff, png, serde_json."
+    }
+  ]
+}
