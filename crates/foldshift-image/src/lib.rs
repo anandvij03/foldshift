@@ -1,6 +1,6 @@
 use std::fs;
 use std::io::{BufWriter, Seek, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use foldshift_core::{FcError, Inspection, MediaKind, Result};
 use image::codecs::jpeg::JpegEncoder;
@@ -102,6 +102,125 @@ pub fn resize(
     let dimensions = resized.dimensions();
     encode_atomic(&resized, output, options)?;
     Ok(dimensions)
+}
+
+pub fn batch_convert(
+    inputs: &[PathBuf],
+    target_ext: &str,
+    output_dir: &Path,
+    pattern: Option<&str>,
+    options: EncodeOptions,
+    cancel_token: &foldshift_core::batch::CancellationToken,
+    progress: impl FnMut(foldshift_core::batch::BatchProgress<'_>),
+) -> Result<foldshift_core::batch::BatchSummary> {
+    if !output_dir.exists() {
+        fs::create_dir_all(output_dir)?;
+    }
+    let items =
+        foldshift_core::batch::prepare_batch_items(inputs, output_dir, pattern, target_ext)?;
+
+    let summary =
+        foldshift_core::batch::execute_sequential_batch(&items, cancel_token, progress, |item| {
+            cancel_token.check_cancelled()?;
+            convert(&item.input, &item.output, options)?;
+            let written = fs::metadata(&item.output).map(|m| m.len()).unwrap_or(0);
+            Ok(written)
+        });
+
+    Ok(summary)
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct BatchResizeOptions {
+    pub width: Option<u32>,
+    pub height: Option<u32>,
+    pub quality: u8,
+    pub force: bool,
+}
+
+impl Default for BatchResizeOptions {
+    fn default() -> Self {
+        Self {
+            width: None,
+            height: None,
+            quality: 82,
+            force: false,
+        }
+    }
+}
+
+pub fn batch_resize(
+    inputs: &[PathBuf],
+    target_ext: Option<&str>,
+    output_dir: &Path,
+    pattern: Option<&str>,
+    options: BatchResizeOptions,
+    cancel_token: &foldshift_core::batch::CancellationToken,
+    progress: impl FnMut(foldshift_core::batch::BatchProgress<'_>),
+) -> Result<foldshift_core::batch::BatchSummary> {
+    if !output_dir.exists() {
+        fs::create_dir_all(output_dir)?;
+    }
+    if options.width.is_none() && options.height.is_none() {
+        return Err(FcError::InvalidOption(
+            "batch resize requires --width, --height, or both".into(),
+        ));
+    }
+    if options.width == Some(0) || options.height == Some(0) {
+        return Err(FcError::InvalidOption(
+            "resize dimensions must be greater than zero".into(),
+        ));
+    }
+
+    let mut items = Vec::with_capacity(inputs.len());
+    let mut seen_outputs = std::collections::HashSet::new();
+
+    for (idx, input) in inputs.iter().enumerate() {
+        let item_id = idx + 1;
+        let ext = match target_ext {
+            Some(e) => e.to_string(),
+            None => input
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("png")
+                .to_string(),
+        };
+
+        let output =
+            foldshift_core::batch::resolve_output_path(input, output_dir, pattern, &ext, item_id)?;
+
+        if !seen_outputs.insert(output.clone()) {
+            return Err(FcError::InvalidOption(format!(
+                "intra-batch destination collision detected: multiple inputs resolve to '{}'",
+                output.display()
+            )));
+        }
+
+        items.push(foldshift_core::batch::BatchItem {
+            id: item_id,
+            input: input.clone(),
+            output,
+        });
+    }
+
+    let summary =
+        foldshift_core::batch::execute_sequential_batch(&items, cancel_token, progress, |item| {
+            cancel_token.check_cancelled()?;
+            resize(
+                &item.input,
+                &item.output,
+                options.width,
+                options.height,
+                EncodeOptions {
+                    quality: options.quality,
+                    force: options.force,
+                },
+            )?;
+            let written = fs::metadata(&item.output).map(|m| m.len()).unwrap_or(0);
+            Ok(written)
+        });
+
+    Ok(summary)
 }
 
 fn scale_dimension(primary: u32, other: u32, requested_other: u32) -> u32 {
@@ -357,6 +476,10 @@ fn format_name(format: ImageFormat) -> &'static str {
 mod tests {
     use super::*;
     use std::path::PathBuf;
+
+    fn make_test_image(w: u32, h: u32) -> DynamicImage {
+        DynamicImage::ImageRgb8(image::RgbImage::from_pixel(w, h, image::Rgb([40, 90, 150])))
+    }
 
     #[test]
     fn converts_every_supported_format_and_reopens() {
@@ -1012,5 +1135,130 @@ mod tests {
         );
         assert!(matches!(err, Err(FcError::InvalidOption(_))));
         assert_eq!(fs::read(&transparent_file).unwrap(), trans_before);
+    }
+
+    #[test]
+    fn batch_convert_and_resize_lifecycle() {
+        let dir = tempfile::tempdir().unwrap();
+        let in1 = dir.path().join("img1.png");
+        let in2 = dir.path().join("img2.png");
+        let in3 = dir.path().join("img3.png");
+
+        make_test_image(10, 10).save(&in1).unwrap();
+        make_test_image(20, 20).save(&in2).unwrap();
+        make_test_image(30, 30).save(&in3).unwrap();
+
+        let out_dir = dir.path().join("converted");
+        let cancel_token = foldshift_core::batch::CancellationToken::new();
+        let mut progress_count = 0;
+
+        // 1. Batch convert with pattern
+        let summary = batch_convert(
+            &[in1.clone(), in2.clone(), in3.clone()],
+            "jpg",
+            &out_dir,
+            Some("{index:02}_{stem}.{ext}"),
+            EncodeOptions::default(),
+            &cancel_token,
+            |_| {
+                progress_count += 1;
+            },
+        )
+        .unwrap();
+
+        assert_eq!(summary.total, 3);
+        assert_eq!(summary.succeeded, 3);
+        assert_eq!(summary.failed, 0);
+        assert!(summary.is_all_success());
+        assert!(out_dir.join("01_img1.jpg").exists());
+        assert!(out_dir.join("02_img2.jpg").exists());
+        assert!(out_dir.join("03_img3.jpg").exists());
+        assert!(progress_count > 0);
+
+        // 2. Batch resize
+        let resize_dir = dir.path().join("resized");
+        let resize_summary = batch_resize(
+            &[in1.clone(), in2.clone(), in3.clone()],
+            Some("png"),
+            &resize_dir,
+            Some("small_{stem}.{ext}"),
+            BatchResizeOptions {
+                width: Some(5),
+                ..Default::default()
+            },
+            &cancel_token,
+            |_| {},
+        )
+        .unwrap();
+
+        assert_eq!(resize_summary.total, 3);
+        assert_eq!(resize_summary.succeeded, 3);
+        assert!(resize_dir.join("small_img1.png").exists());
+        let insp = inspect(&resize_dir.join("small_img1.png")).unwrap();
+        assert_eq!(insp.properties.get("width").unwrap(), &5);
+    }
+
+    #[test]
+    fn batch_convert_independent_failures_and_cancellation() {
+        let dir = tempfile::tempdir().unwrap();
+        let good1 = dir.path().join("good1.png");
+        let corrupt = dir.path().join("corrupt.png");
+        let good2 = dir.path().join("good2.png");
+
+        make_test_image(10, 10).save(&good1).unwrap();
+        fs::write(&corrupt, b"not an image at all").unwrap();
+        make_test_image(10, 10).save(&good2).unwrap();
+
+        let out_dir = dir.path().join("batch_fail_out");
+        let cancel_token = foldshift_core::batch::CancellationToken::new();
+
+        // Independent failure test: corrupt file fails, good files succeed!
+        let summary = batch_convert(
+            &[good1.clone(), corrupt.clone(), good2.clone()],
+            "jpg",
+            &out_dir,
+            None,
+            EncodeOptions::default(),
+            &cancel_token,
+            |_| {},
+        )
+        .unwrap();
+
+        assert_eq!(summary.total, 3);
+        assert_eq!(summary.succeeded, 2);
+        assert_eq!(summary.failed, 1);
+        assert_eq!(summary.cancelled, 0);
+        assert!(summary.has_failures_or_cancellations());
+        assert!(out_dir.join("good1.jpg").exists());
+        assert!(!out_dir.join("corrupt.jpg").exists());
+        assert!(out_dir.join("good2.jpg").exists());
+
+        // Cancellation test
+        let cancel_out_dir = dir.path().join("batch_cancel_out");
+        let cancel_tok = foldshift_core::batch::CancellationToken::new();
+        let tok_clone = cancel_tok.clone();
+
+        let cancel_summary = batch_convert(
+            &[good1.clone(), good2.clone()],
+            "jpg",
+            &cancel_out_dir,
+            None,
+            EncodeOptions::default(),
+            &cancel_tok,
+            |ev| {
+                if let foldshift_core::batch::BatchProgress::ItemCompleted { index, .. } = ev
+                    && index == 1
+                {
+                    tok_clone.cancel();
+                }
+            },
+        )
+        .unwrap();
+
+        assert_eq!(cancel_summary.total, 2);
+        assert_eq!(cancel_summary.succeeded, 1);
+        assert_eq!(cancel_summary.cancelled, 1);
+        assert!(cancel_out_dir.join("good1.jpg").exists());
+        assert!(!cancel_out_dir.join("good2.jpg").exists());
     }
 }

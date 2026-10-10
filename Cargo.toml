@@ -19,6 +19,7 @@ rust-version = "1.88"
 anyhow = "1"
 axum = { version = "0.8", features = ["multipart"] }
 clap = { version = "4", features = ["derive"] }
+ctrlc = { version = "3.4", features = ["termination"] }
 gif = { version = "0.14", default-features = false }
 image = { version = "0.25", default-features = false, features = [
     "bmp",

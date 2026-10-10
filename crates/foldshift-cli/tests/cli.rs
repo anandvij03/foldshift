@@ -30,7 +30,7 @@ fn cli_capabilities_reflects_enabled_capabilities() {
 #[cfg(not(feature = "image"))]
 #[test]
 fn cli_core_only_rejects_image_subcommands() {
-    for cmd in ["convert", "image", "inspect"] {
+    for cmd in ["convert", "image", "inspect", "batch"] {
         let result = Command::new(env!("CARGO_BIN_EXE_foldshift"))
             .arg(cmd)
             .output()
@@ -818,4 +818,118 @@ fn cli_packs_install_rejects_checksum_mismatch() {
     assert!(!res.status.success());
     let stderr = String::from_utf8_lossy(&res.stderr);
     assert!(stderr.contains("checksum mismatch"));
+}
+
+#[cfg(feature = "image")]
+#[test]
+fn cli_batch_convert_success_and_json_summary() {
+    let dir = tempfile::tempdir().unwrap();
+    let img1 = dir.path().join("source1.png");
+    let img2 = dir.path().join("source2.png");
+    let img3 = dir.path().join("source3.png");
+
+    image::DynamicImage::new_rgb8(10, 10).save(&img1).unwrap();
+    image::DynamicImage::new_rgb8(20, 20).save(&img2).unwrap();
+    image::DynamicImage::new_rgb8(30, 30).save(&img3).unwrap();
+
+    let out_dir = dir.path().join("batch_out");
+
+    let result = Command::new(env!("CARGO_BIN_EXE_foldshift"))
+        .arg("batch")
+        .arg("convert")
+        .arg(&img1)
+        .arg(&img2)
+        .arg(&img3)
+        .args(["-t", "jpg", "-o"])
+        .arg(&out_dir)
+        .args(["--pattern", "{index:02}_{stem}.{ext}", "--json"])
+        .output()
+        .unwrap();
+
+    assert!(
+        result.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let summary: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
+    assert_eq!(summary["total"], 3);
+    assert_eq!(summary["succeeded"], 3);
+    assert_eq!(summary["failed"], 0);
+    assert_eq!(summary["cancelled"], 0);
+
+    assert!(out_dir.join("01_source1.jpg").exists());
+    assert!(out_dir.join("02_source2.jpg").exists());
+    assert!(out_dir.join("03_source3.jpg").exists());
+}
+
+#[cfg(feature = "image")]
+#[test]
+fn cli_batch_convert_independent_failures() {
+    let dir = tempfile::tempdir().unwrap();
+    let good1 = dir.path().join("good1.png");
+    let corrupt = dir.path().join("corrupt.png");
+    let good2 = dir.path().join("good2.png");
+
+    image::DynamicImage::new_rgb8(10, 10).save(&good1).unwrap();
+    std::fs::write(&corrupt, b"invalid image data").unwrap();
+    image::DynamicImage::new_rgb8(10, 10).save(&good2).unwrap();
+
+    let out_dir = dir.path().join("batch_fail_out");
+
+    let result = Command::new(env!("CARGO_BIN_EXE_foldshift"))
+        .arg("batch")
+        .arg("convert")
+        .arg(&good1)
+        .arg(&corrupt)
+        .arg(&good2)
+        .args(["-t", "jpg", "-o"])
+        .arg(&out_dir)
+        .output()
+        .unwrap();
+
+    // Command returns error exit code because of the failed item
+    assert!(!result.status.success());
+    let stdout = String::from_utf8_lossy(&result.stdout);
+    assert!(stdout.contains("Processing good1.png ... OK"));
+    assert!(stdout.contains("Processing corrupt.png ... FAILED"));
+    assert!(stdout.contains("Processing good2.png ... OK"));
+    assert!(stdout.contains("Succeeded:    2"));
+    assert!(stdout.contains("Failed:       1"));
+
+    // Good files were converted, corrupt was not created
+    assert!(out_dir.join("good1.jpg").exists());
+    assert!(!out_dir.join("corrupt.jpg").exists());
+    assert!(out_dir.join("good2.jpg").exists());
+}
+
+#[cfg(feature = "image")]
+#[test]
+fn cli_batch_resize() {
+    let dir = tempfile::tempdir().unwrap();
+    let img1 = dir.path().join("orig1.png");
+    let img2 = dir.path().join("orig2.png");
+
+    image::DynamicImage::new_rgb8(20, 20).save(&img1).unwrap();
+    image::DynamicImage::new_rgb8(40, 40).save(&img2).unwrap();
+
+    let out_dir = dir.path().join("batch_resized");
+
+    let result = Command::new(env!("CARGO_BIN_EXE_foldshift"))
+        .arg("batch")
+        .arg("resize")
+        .arg(&img1)
+        .arg(&img2)
+        .args(["--width", "8", "-o"])
+        .arg(&out_dir)
+        .args(["--pattern", "thumb_{stem}.{ext}"])
+        .output()
+        .unwrap();
+
+    assert!(
+        result.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert!(out_dir.join("thumb_orig1.png").exists());
+    assert!(out_dir.join("thumb_orig2.png").exists());
 }

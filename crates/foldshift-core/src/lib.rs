@@ -56,6 +56,7 @@ impl Inspection {
     }
 }
 
+pub mod batch;
 pub mod pack;
 
 #[derive(Debug, Error)]
@@ -103,6 +104,18 @@ pub fn operations_with(mut is_available: impl FnMut(&str) -> bool) -> Vec<Operat
         OperationInfo {
             id: "image.resize".into(),
             summary: "Resize an image while preserving aspect ratio".into(),
+            capability: "image".into(),
+            available: is_available("image"),
+        },
+        OperationInfo {
+            id: "batch.convert".into(),
+            summary: "Batch convert multiple files sequentially with progress reporting".into(),
+            capability: "image".into(),
+            available: is_available("image"),
+        },
+        OperationInfo {
+            id: "batch.resize".into(),
+            summary: "Batch resize multiple files sequentially with progress reporting".into(),
             capability: "image".into(),
             available: is_available("image"),
         },
@@ -173,7 +186,7 @@ mod tests {
             .iter()
             .filter(|op| op.capability == "image")
             .collect();
-        assert_eq!(image_ops.len(), 3);
+        assert_eq!(image_ops.len(), 5);
         assert!(image_ops.iter().all(|op| op.available));
 
         let non_image_ops: Vec<_> = with_image

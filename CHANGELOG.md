@@ -18,7 +18,11 @@
 - Native 1-component grayscale JPEG encoding for 8-bit and 16-bit luma inputs without expanding to RGB.
 - Allocation-free inspection of native pixel buffers for transparency, allowing fully opaque alpha channels to convert cleanly to JPEG.
 - Output preservation and temporary-file publication through `tempfile`.
-- Tests for conversion, resizing, corrupt input, and overwrite behavior.
+- Sequential batch conversion and resizing engine in `foldshift-core` and `foldshift-image` with independent failure isolation.
+- Flexible and secure naming pattern resolution (`{stem}`, `{name}`, `{ext}`, `{index}`, `{index:03}`, `{index0}`) with intra-batch collision detection and path traversal rejection.
+- Cooperative cancellation tokens (`CancellationToken`) and CLI signal handling (Ctrl+C) ensuring safe termination without destination corruption.
+- Real-time item-by-item progress reporting and machine-readable JSON summaries via `foldshift batch convert` and `foldshift batch resize`.
+- Tests for conversion, resizing, corrupt input, overwrite behavior, and sequential batch execution.
 - CI configuration for Windows, macOS, and Linux; contributor and issue templates.
 
 ### Changed

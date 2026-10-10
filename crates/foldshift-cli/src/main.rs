@@ -53,6 +53,12 @@ enum Command {
         #[command(subcommand)]
         command: ImageCommand,
     },
+    /// Batch operations for processing multiple files sequentially.
+    #[cfg(feature = "image")]
+    Batch {
+        #[command(subcommand)]
+        command: BatchCommand,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -169,6 +175,73 @@ struct ResizeArgs {
     force: bool,
 }
 
+#[cfg(feature = "image")]
+#[derive(Debug, Subcommand)]
+enum BatchCommand {
+    /// Convert multiple images sequentially with progress reporting.
+    Convert(BatchConvertArgs),
+    /// Resize multiple images sequentially with progress reporting.
+    Resize(BatchResizeArgs),
+}
+
+#[cfg(feature = "image")]
+#[derive(Debug, Args)]
+struct BatchConvertArgs {
+    /// Input files to convert.
+    #[arg(required = true, num_args = 1..)]
+    inputs: Vec<PathBuf>,
+    /// Destination format / extension (e.g. 'png', 'jpg', 'webp').
+    #[arg(long, short = 't')]
+    to: String,
+    /// Directory where converted files will be saved.
+    #[arg(long, short = 'o')]
+    out_dir: PathBuf,
+    /// Naming pattern for output files (e.g. '{stem}.{ext}', '{stem}-converted.{ext}', '{index:03}_{stem}.{ext}').
+    #[arg(long)]
+    pattern: Option<String>,
+    /// JPEG quality from 1 to 100.
+    #[arg(long, default_value_t = 82, value_parser = clap::value_parser!(u8).range(1..=100))]
+    quality: u8,
+    /// Overwrite existing output files.
+    #[arg(long)]
+    force: bool,
+    /// Emit machine-readable JSON summary upon completion.
+    #[arg(long)]
+    json: bool,
+}
+
+#[cfg(feature = "image")]
+#[derive(Debug, Args)]
+struct BatchResizeArgs {
+    /// Input files to resize.
+    #[arg(required = true, num_args = 1..)]
+    inputs: Vec<PathBuf>,
+    /// Directory where resized files will be saved.
+    #[arg(long, short = 'o')]
+    out_dir: PathBuf,
+    /// Maximum output width.
+    #[arg(long)]
+    width: Option<u32>,
+    /// Maximum output height.
+    #[arg(long)]
+    height: Option<u32>,
+    /// Optional target format (defaults to source format if not specified).
+    #[arg(long, short = 't')]
+    to: Option<String>,
+    /// Naming pattern for output files (e.g. '{stem}.{ext}', 'thumb_{stem}.{ext}').
+    #[arg(long)]
+    pattern: Option<String>,
+    /// JPEG quality from 1 to 100.
+    #[arg(long, default_value_t = 82, value_parser = clap::value_parser!(u8).range(1..=100))]
+    quality: u8,
+    /// Overwrite existing output files.
+    #[arg(long)]
+    force: bool,
+    /// Emit machine-readable JSON summary upon completion.
+    #[arg(long)]
+    json: bool,
+}
+
 fn main() {
     if let Err(error) = run() {
         eprintln!("error: {error:#}");
@@ -219,6 +292,11 @@ fn run() -> Result<()> {
         Command::Image {
             command: ImageCommand::Resize(args),
         } => resize(args)?,
+        #[cfg(feature = "image")]
+        Command::Batch { command } => match command {
+            BatchCommand::Convert(args) => batch_convert_cmd(args)?,
+            BatchCommand::Resize(args) => batch_resize_cmd(args)?,
+        },
     }
     Ok(())
 }
@@ -453,6 +531,178 @@ fn resize(args: ResizeArgs) -> Result<()> {
         height
     );
     Ok(())
+}
+
+#[cfg(feature = "image")]
+fn batch_convert_cmd(args: BatchConvertArgs) -> Result<()> {
+    let cancel_token = foldshift_core::batch::CancellationToken::new();
+    let handler_token = cancel_token.clone();
+    let interrupt_count = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let interrupt_clone = interrupt_count.clone();
+
+    let _ = ctrlc::set_handler(move || {
+        let prev = interrupt_clone.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        if prev == 0 {
+            eprintln!(
+                "\nCancellation requested (Ctrl+C). Safely stopping batch after current item..."
+            );
+            handler_token.cancel();
+        } else {
+            eprintln!("\nSecond interrupt received. Terminating immediately.");
+            std::process::exit(130);
+        }
+    });
+
+    let json_mode = args.json;
+    let summary = foldshift_image::batch_convert(
+        &args.inputs,
+        &args.to,
+        &args.out_dir,
+        args.pattern.as_deref(),
+        EncodeOptions {
+            quality: args.quality,
+            force: args.force,
+        },
+        &cancel_token,
+        |ev| {
+            if !json_mode {
+                render_batch_progress(&ev);
+            }
+        },
+    )?;
+
+    if json_mode {
+        println!("{}", serde_json::to_string_pretty(&summary)?);
+    } else {
+        render_batch_summary(&summary);
+    }
+
+    if summary.has_failures_or_cancellations() {
+        anyhow::bail!(
+            "Batch completed with issues: {} succeeded, {} failed, {} cancelled",
+            summary.succeeded,
+            summary.failed,
+            summary.cancelled
+        );
+    }
+
+    Ok(())
+}
+
+#[cfg(feature = "image")]
+fn batch_resize_cmd(args: BatchResizeArgs) -> Result<()> {
+    let cancel_token = foldshift_core::batch::CancellationToken::new();
+    let handler_token = cancel_token.clone();
+    let interrupt_count = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let interrupt_clone = interrupt_count.clone();
+
+    let _ = ctrlc::set_handler(move || {
+        let prev = interrupt_clone.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        if prev == 0 {
+            eprintln!(
+                "\nCancellation requested (Ctrl+C). Safely stopping batch after current item..."
+            );
+            handler_token.cancel();
+        } else {
+            eprintln!("\nSecond interrupt received. Terminating immediately.");
+            std::process::exit(130);
+        }
+    });
+
+    let json_mode = args.json;
+    let summary = foldshift_image::batch_resize(
+        &args.inputs,
+        args.to.as_deref(),
+        &args.out_dir,
+        args.pattern.as_deref(),
+        foldshift_image::BatchResizeOptions {
+            width: args.width,
+            height: args.height,
+            quality: args.quality,
+            force: args.force,
+        },
+        &cancel_token,
+        |ev| {
+            if !json_mode {
+                render_batch_progress(&ev);
+            }
+        },
+    )?;
+
+    if json_mode {
+        println!("{}", serde_json::to_string_pretty(&summary)?);
+    } else {
+        render_batch_summary(&summary);
+    }
+
+    if summary.has_failures_or_cancellations() {
+        anyhow::bail!(
+            "Batch completed with issues: {} succeeded, {} failed, {} cancelled",
+            summary.succeeded,
+            summary.failed,
+            summary.cancelled
+        );
+    }
+
+    Ok(())
+}
+
+#[cfg(feature = "image")]
+fn render_batch_progress(ev: &foldshift_core::batch::BatchProgress<'_>) {
+    use foldshift_core::batch::{BatchProgress, ItemStatus};
+    match ev {
+        BatchProgress::Started { total } => {
+            println!("Batch started: {total} item(s) queued for processing");
+        }
+        BatchProgress::ItemStarted {
+            index,
+            total,
+            input,
+            ..
+        } => {
+            let filename = input.file_name().and_then(|n| n.to_str()).unwrap_or("file");
+            print!("[{index}/{total}] Processing {filename} ... ");
+            let _ = std::io::Write::flush(&mut std::io::stdout());
+        }
+        BatchProgress::ItemCompleted { result, .. } => match result.status {
+            ItemStatus::Success => {
+                let bytes = result.bytes_written.unwrap_or(0);
+                println!("OK ({} bytes, {}ms)", bytes, result.duration_ms);
+            }
+            ItemStatus::Failed => {
+                println!(
+                    "FAILED: {}",
+                    result.error.as_deref().unwrap_or("unknown error")
+                );
+            }
+            ItemStatus::Cancelled => {
+                println!("CANCELLED");
+            }
+            ItemStatus::Skipped => {
+                println!("SKIPPED");
+            }
+        },
+        BatchProgress::Cancelled {
+            completed,
+            remaining,
+        } => {
+            println!("\nBatch cancelled: {completed} completed, {remaining} skipped");
+        }
+        BatchProgress::Finished { .. } => {}
+    }
+}
+
+#[cfg(feature = "image")]
+fn render_batch_summary(summary: &foldshift_core::batch::BatchSummary) {
+    println!("\n====================================================");
+    println!("  Batch Execution Summary");
+    println!("====================================================");
+    println!("  Total items:  {}", summary.total);
+    println!("  Succeeded:    {}", summary.succeeded);
+    println!("  Failed:       {}", summary.failed);
+    println!("  Cancelled:    {}", summary.cancelled);
+    println!("  Elapsed time: {}ms", summary.duration_ms);
+    println!("====================================================");
 }
 
 fn pdf_inspect(file: PathBuf, json_output: bool) -> Result<()> {

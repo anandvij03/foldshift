@@ -65,6 +65,11 @@ foldshift convert photo.png photo.jpg --quality 88
 foldshift image resize photo.jpg resized.webp --width 1600 --height 1600
 foldshift image resize photo.jpg resized.jpg --width 1600 --quality 85 --force
 
+# Sequential batch processing with naming patterns and progress
+foldshift batch convert img1.png img2.png -t webp -o ./out --pattern "{stem}-optimized.{ext}"
+foldshift batch resize img1.jpg img2.jpg -o ./thumbnails --width 800 --pattern "thumb_{stem}.{ext}"
+foldshift batch convert img1.png img2.png -t jpg -o ./out --json
+
 # Launch lightweight local browser UI
 cargo run --bin foldshift-web
 # or customize host and port:

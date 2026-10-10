@@ -41,7 +41,7 @@ no external agent has been started by this document.
 | M3 | FS-021 | qpdf adapter: inspect, merge, extract pages | Antigravity | FS-020 | Merged |
 | M3 | FS-022 | Verified pack install/update/remove and offline import | Antigravity | FS-020 | Merged |
 | M3 | FS-023 | Review process limits, recovery and license notices | Codex review | FS-021/022 | Merged |
-| M4: batch/media | FS-030 | Sequential batches, names, progress and cancellation | Antigravity | M2 | Queued |
+| M4: batch/media | FS-030 | Sequential batches, names, progress and cancellation | Antigravity | M2 | Implementing |
 | M4 | FS-031 | Audio adapter and shared media engine pack | Antigravity | M3 | Queued |
 | M4 | FS-032 | Video operations and measured concurrency settings | Antigravity | FS-030/031 | Queued |
 | M5: desktop | FS-040 | Thin UI over tested operations and capability selection | Antigravity | M2 + stable operation contract | Queued |
