@@ -63,6 +63,35 @@ enum PacksCommand {
         #[arg(long)]
         json: bool,
     },
+    /// Install an engine capability pack from an offline archive.
+    Install {
+        /// Capability to install (e.g. 'pdf', 'media').
+        #[arg(value_name = "CAPABILITY")]
+        capability: Option<String>,
+        /// Path to offline pack archive (.zip).
+        #[arg(long)]
+        from_file: Option<PathBuf>,
+        /// Expected SHA-256 checksum to verify against the archive.
+        #[arg(long)]
+        sha256: Option<String>,
+    },
+    /// Update an installed engine capability pack to a new version.
+    Update {
+        /// Capability to update (e.g. 'pdf', 'media').
+        #[arg(value_name = "CAPABILITY")]
+        capability: Option<String>,
+        /// Path to offline pack archive (.zip).
+        #[arg(long)]
+        from_file: Option<PathBuf>,
+        /// Expected SHA-256 checksum to verify against the archive.
+        #[arg(long)]
+        sha256: Option<String>,
+    },
+    /// Remove an installed engine capability pack.
+    Remove {
+        /// Capability to remove (e.g. 'pdf', 'media').
+        capability: String,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -153,6 +182,17 @@ fn run() -> Result<()> {
         Command::Capabilities { json } => capabilities(json)?,
         Command::Packs { command } => match command {
             PacksCommand::List { json } => packs_list(json)?,
+            PacksCommand::Install {
+                capability,
+                from_file,
+                sha256,
+            } => packs_install(capability, from_file, sha256)?,
+            PacksCommand::Update {
+                capability,
+                from_file,
+                sha256,
+            } => packs_update(capability, from_file, sha256)?,
+            PacksCommand::Remove { capability } => packs_remove(capability)?,
         },
         Command::Pdf { command } => match command {
             PdfCommand::Inspect { file, json } => pdf_inspect(file, json)?,
@@ -274,6 +314,88 @@ fn packs_list(json: bool) -> Result<()> {
         foldshift_core::pack::packs_dir().display()
     );
     println!("Run 'foldshift capabilities' to inspect active operations.");
+    Ok(())
+}
+
+fn packs_install(
+    capability: Option<String>,
+    from_file: Option<PathBuf>,
+    sha256: Option<String>,
+) -> Result<()> {
+    let Some(archive_path) = from_file else {
+        let cap_hint = capability.as_deref().unwrap_or("<capability>");
+        anyhow::bail!(
+            "Offline mode: automatic network download is not enabled.\n\
+             To install an optional engine pack offline, download the verified pack archive (.zip) and run:\n  \
+             foldshift packs install {} --from-file <path-to-archive.zip>",
+            cap_hint
+        );
+    };
+
+    if !archive_path.is_file() {
+        anyhow::bail!("archive file does not exist: {}", archive_path.display());
+    }
+
+    let packs_dir = foldshift_core::pack::packs_dir();
+    let options = foldshift_core::pack::InstallOptions {
+        expected_capability: capability.as_deref(),
+        expected_sha256: sha256.as_deref(),
+    };
+
+    let installed =
+        foldshift_core::pack::install_pack_from_archive(&archive_path, &packs_dir, &options)?;
+    println!(
+        "Successfully installed pack '{}' v{} for capability '{}'.",
+        installed.name, installed.version, installed.capability
+    );
+    println!("Location: {}", installed.install_dir.display());
+    println!("Entrypoint: {}", installed.resolved_entrypoint().display());
+    Ok(())
+}
+
+fn packs_update(
+    capability: Option<String>,
+    from_file: Option<PathBuf>,
+    sha256: Option<String>,
+) -> Result<()> {
+    let Some(archive_path) = from_file else {
+        let cap_hint = capability.as_deref().unwrap_or("<capability>");
+        anyhow::bail!(
+            "Offline mode: automatic network download is not enabled.\n\
+             To update an engine pack offline, download the verified pack archive (.zip) and run:\n  \
+             foldshift packs update {} --from-file <path-to-archive.zip>",
+            cap_hint
+        );
+    };
+
+    if !archive_path.is_file() {
+        anyhow::bail!("archive file does not exist: {}", archive_path.display());
+    }
+
+    let packs_dir = foldshift_core::pack::packs_dir();
+    let options = foldshift_core::pack::InstallOptions {
+        expected_capability: capability.as_deref(),
+        expected_sha256: sha256.as_deref(),
+    };
+
+    let updated =
+        foldshift_core::pack::update_pack_from_archive(&archive_path, &packs_dir, &options)?;
+    println!(
+        "Successfully updated pack '{}' to v{} for capability '{}'.",
+        updated.name, updated.version, updated.capability
+    );
+    println!("Location: {}", updated.install_dir.display());
+    Ok(())
+}
+
+fn packs_remove(capability: String) -> Result<()> {
+    let packs_dir = foldshift_core::pack::packs_dir();
+    let removed = foldshift_core::pack::remove_pack(&capability, &packs_dir)?;
+    println!(
+        "Successfully removed pack '{}' v{} for capability '{}'.",
+        removed.name, removed.version, removed.capability
+    );
+    println!("Cleaned up directory: {}", removed.install_dir.display());
     Ok(())
 }
 

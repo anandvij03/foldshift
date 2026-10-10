@@ -25,6 +25,7 @@ pub fn app() -> Router {
     Router::new()
         .route("/", get(serve_index))
         .route("/api/capabilities", get(api_capabilities))
+        .route("/api/packs", get(api_packs))
         .route("/api/inspect", post(api_inspect))
         .route("/api/convert", post(api_convert))
         .route("/api/resize", post(api_resize))
@@ -87,6 +88,10 @@ async fn api_capabilities() -> Json<SystemStatus> {
             _ => false,
         }),
     })
+}
+
+async fn api_packs() -> Json<Vec<foldshift_core::pack::PackStatus>> {
+    Json(foldshift_core::pack::list_pack_statuses())
 }
 
 async fn api_inspect(
