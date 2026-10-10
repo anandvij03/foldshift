@@ -54,6 +54,11 @@ foldshift convert photo.png photo.jpg --quality 88
 
 foldshift image resize photo.jpg resized.webp --width 1600 --height 1600
 foldshift image resize photo.jpg resized.jpg --width 1600 --quality 85 --force
+
+# Launch lightweight local browser UI
+cargo run --bin foldshift-web
+# or customize host and port:
+cargo run --bin foldshift-web -- --port 8080 --no-open
 ```
 
 At least one of `--width` and `--height` is required for resize. When only one

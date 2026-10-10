@@ -3,8 +3,9 @@ A lightweight, local file processing and editing framework that works modularly 
 
 **Convert files. Keep them yours.**
 
-The current implementation is an early Rust CLI for still-image conversion,
-resizing, and inspection. Broader format support and a desktop UI are planned.
+The current implementation provides a lightweight Rust CLI and a local,
+browser-based web UI for image conversion, resizing, and inspection. Broader
+format support and a desktop UI are planned.
 
 - [Project overview and commands](PROJECT-OVERVIEW.md)
 - [Contributing](CONTRIBUTING.md)

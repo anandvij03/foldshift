@@ -1,0 +1,1102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FoldShift — Local File Engine</title>
+  <style>
+    :root {
+      --bg: #090a0f;
+      --surface: #12141a;
+      --surface-2: #191c24;
+      --border: #242834;
+      --border-focus: #3d4456;
+      --text: #e2e4ea;
+      --text-muted: #838a9e;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --accent-subtle: rgba(59, 130, 246, 0.12);
+      --success: #10b981;
+      --success-subtle: rgba(16, 185, 129, 0.12);
+      --error: #ef4444;
+      --error-subtle: rgba(239, 68, 68, 0.12);
+      --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      font-size: 14px;
+      line-height: 1.5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Container */
+    .container {
+      width: 100%;
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 32px 20px 48px;
+    }
+
+    /* Header */
+    header {
+      margin-bottom: 28px;
+    }
+
+    .brand-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .brand-title {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-badge {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      padding: 2px 7px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      font-weight: 500;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--success);
+      background: var(--success-subtle);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+      padding: 3px 10px;
+      border-radius: 12px;
+    }
+
+    .pulse-dot {
+      width: 6px;
+      height: 6px;
+      background: var(--success);
+      border-radius: 50%;
+      box-shadow: 0 0 6px var(--success);
+    }
+
+    .brand-subtitle {
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    /* Navigation Tabs */
+    .tabs {
+      display: flex;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 3px;
+      gap: 3px;
+      margin-bottom: 24px;
+    }
+
+    .tab-btn {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 8px 12px;
+      font-size: 13px;
+      font-weight: 500;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      font-family: inherit;
+    }
+
+    .tab-btn:hover {
+      color: var(--text);
+    }
+
+    .tab-btn.active {
+      background: var(--surface-2);
+      color: #fff;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    }
+
+    /* Common Card */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 22px;
+      margin-bottom: 20px;
+    }
+
+    /* Dropzone */
+    .dropzone {
+      border: 1.5px dashed var(--border);
+      background: var(--surface-2);
+      border-radius: 8px;
+      padding: 32px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      position: relative;
+    }
+
+    .dropzone:hover, .dropzone.dragover {
+      border-color: var(--accent);
+      background: rgba(59, 130, 246, 0.04);
+    }
+
+    .dropzone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    .dropzone-icon {
+      font-size: 24px;
+      margin-bottom: 8px;
+      color: var(--text-muted);
+    }
+
+    .dropzone-title {
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+
+    .dropzone-hint {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+
+    /* Selected File Bar */
+    .file-bar {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 20px;
+    }
+
+    .file-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      overflow: hidden;
+    }
+
+    .file-thumb {
+      width: 44px;
+      height: 44px;
+      border-radius: 4px;
+      object-fit: cover;
+      background: #000;
+      border: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .file-meta {
+      overflow: hidden;
+    }
+
+    .file-name {
+      font-weight: 600;
+      font-size: 13px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 400px;
+    }
+
+    .file-specs {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .btn-clear {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .btn-clear:hover {
+      color: var(--text);
+      border-color: var(--border-focus);
+    }
+
+    /* Form Controls */
+    .form-group {
+      margin-bottom: 18px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+    }
+
+    .format-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 6px;
+    }
+
+    @media (max-width: 600px) {
+      .format-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+
+    .format-btn {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px 4px;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s ease;
+    }
+
+    .format-btn:hover {
+      border-color: var(--border-focus);
+    }
+
+    .format-btn.active {
+      border-color: var(--accent);
+      background: var(--accent-subtle);
+      color: #fff;
+    }
+
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .slider {
+      flex: 1;
+      height: 5px;
+      background: var(--surface-2);
+      border-radius: 3px;
+      outline: none;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    .slider-val {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      width: 38px;
+      text-align: right;
+      color: var(--text);
+    }
+
+    .input-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .text-input {
+      width: 100%;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 10px 12px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      outline: none;
+    }
+
+    .text-input:focus {
+      border-color: var(--accent);
+    }
+
+    .form-hint {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 6px;
+    }
+
+    /* Primary Action Button */
+    .btn-action {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      background: #fff;
+      color: #000;
+      border: none;
+      padding: 12px 18px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s ease;
+      font-family: inherit;
+    }
+
+    .btn-action:hover:not(:disabled) {
+      background: #eaeaea;
+    }
+
+    .btn-action:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    /* Message Boxes */
+    .msg-box {
+      display: none;
+      border-radius: 6px;
+      padding: 12px 14px;
+      font-size: 13px;
+      margin-top: 16px;
+    }
+
+    .msg-box.error {
+      display: block;
+      background: var(--error-subtle);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #fca5a5;
+    }
+
+    .msg-box.success {
+      display: block;
+      background: var(--success-subtle);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: #86efac;
+    }
+
+    /* Inspection Spec Grid */
+    .spec-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    @media (max-width: 500px) {
+      .spec-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .spec-item {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 14px;
+    }
+
+    .spec-key {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 2px;
+    }
+
+    .spec-val {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      word-break: break-all;
+    }
+
+    /* Capabilities Table */
+    .cap-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    @media (max-width: 500px) {
+      .cap-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .cap-box {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+
+    .cap-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .cap-name {
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    .badge-installed {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--success);
+      background: var(--success-subtle);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .badge-planned {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+      background: rgba(255, 255, 255, 0.05);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .cap-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .ops-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      margin-top: 10px;
+    }
+
+    .ops-table th {
+      text-align: left;
+      padding: 8px 12px;
+      color: var(--text-muted);
+      font-weight: 600;
+      border-bottom: 1px solid var(--border);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .ops-table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .ops-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .ops-id {
+      font-family: var(--font-mono);
+      color: var(--text);
+    }
+
+    /* Footer */
+    footer {
+      margin-top: auto;
+      text-align: center;
+      padding-top: 24px;
+      color: var(--text-muted);
+      font-size: 12px;
+      border-top: 1px solid var(--border);
+    }
+
+    /* Tab Panels */
+    .tab-panel {
+      display: none;
+    }
+
+    .tab-panel.active {
+      display: block;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(0, 0, 0, 0.25);
+      border-top-color: #000;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand-row">
+        <div class="brand-title">
+          <span>FOLDSHIFT</span>
+          <span class="brand-badge" id="version-badge">v0.1.0</span>
+        </div>
+        <div class="status-pill">
+          <span class="pulse-dot"></span>
+          <span>Local Engine Active</span>
+        </div>
+      </div>
+      <div class="brand-subtitle">
+        Private, local-first file processing. Files never leave your device.
+      </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="tabs">
+      <button class="tab-btn active" data-tab="tab-convert">Convert</button>
+      <button class="tab-btn" data-tab="tab-resize">Resize</button>
+      <button class="tab-btn" data-tab="tab-inspect">Inspect</button>
+      <button class="tab-btn" data-tab="tab-system">Status & Capabilities</button>
+    </nav>
+
+    <!-- Global Upload Area (Used by Convert, Resize, Inspect) -->
+    <div id="upload-section">
+      <div class="dropzone" id="dropzone">
+        <input type="file" id="file-input" accept="image/*,.png,.jpg,.jpeg,.webp,.gif,.bmp,.tif,.tiff">
+        <div class="dropzone-icon">⤓</div>
+        <div class="dropzone-title">Drop an image here or click to choose</div>
+        <div class="dropzone-hint">Supported: PNG, JPEG, WebP, GIF, BMP, TIFF (Max 100MB)</div>
+      </div>
+
+      <div class="file-bar" id="file-bar">
+        <div class="file-info">
+          <img class="file-thumb" id="file-preview" alt="Preview">
+          <div class="file-meta">
+            <div class="file-name" id="file-name">filename.png</div>
+            <div class="file-specs" id="file-specs">0 KB</div>
+          </div>
+        </div>
+        <button class="btn-clear" id="btn-clear" type="button">Remove</button>
+      </div>
+    </div>
+
+    <!-- TAB 1: CONVERT -->
+    <main class="tab-panel active" id="tab-convert">
+      <div class="card">
+        <div class="form-group">
+          <label class="form-label">Target Format</label>
+          <div class="format-grid" id="convert-formats">
+            <button type="button" class="format-btn active" data-fmt="webp">WEBP</button>
+            <button type="button" class="format-btn" data-fmt="png">PNG</button>
+            <button type="button" class="format-btn" data-fmt="jpg">JPEG</button>
+            <button type="button" class="format-btn" data-fmt="gif">GIF</button>
+            <button type="button" class="format-btn" data-fmt="bmp">BMP</button>
+            <button type="button" class="format-btn" data-fmt="tiff">TIFF</button>
+          </div>
+        </div>
+
+        <div class="form-group" id="convert-quality-group" style="display: none;">
+          <label class="form-label">JPEG Quality</label>
+          <div class="slider-row">
+            <input type="range" class="slider" id="convert-quality" min="1" max="100" value="82">
+            <span class="slider-val" id="convert-quality-val">82</span>
+          </div>
+          <div class="form-hint">Controls JPEG compression (1–100). Higher is better visual fidelity.</div>
+        </div>
+
+        <button class="btn-action" id="btn-convert-run" disabled>
+          <span>Convert & Download</span>
+        </button>
+
+        <div class="msg-box" id="convert-msg"></div>
+      </div>
+    </main>
+
+    <!-- TAB 2: RESIZE -->
+    <main class="tab-panel" id="tab-resize">
+      <div class="card">
+        <div class="form-group">
+          <label class="form-label">Bounding Box Dimensions</label>
+          <div class="input-grid">
+            <div>
+              <input type="number" class="text-input" id="resize-w" placeholder="Max Width (px)" min="1">
+              <div class="form-hint">e.g. 1920</div>
+            </div>
+            <div>
+              <input type="number" class="text-input" id="resize-h" placeholder="Max Height (px)" min="1">
+              <div class="form-hint">e.g. 1080</div>
+            </div>
+          </div>
+          <div class="form-hint">Original aspect ratio is always strictly preserved. Provide width, height, or both.</div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Output Format</label>
+          <div class="format-grid" id="resize-formats">
+            <button type="button" class="format-btn active" data-fmt="">Same as input</button>
+            <button type="button" class="format-btn" data-fmt="webp">WEBP</button>
+            <button type="button" class="format-btn" data-fmt="png">PNG</button>
+            <button type="button" class="format-btn" data-fmt="jpg">JPEG</button>
+            <button type="button" class="format-btn" data-fmt="tiff">TIFF</button>
+          </div>
+        </div>
+
+        <div class="form-group" id="resize-quality-group" style="display: none;">
+          <label class="form-label">JPEG Quality</label>
+          <div class="slider-row">
+            <input type="range" class="slider" id="resize-quality" min="1" max="100" value="82">
+            <span class="slider-val" id="resize-quality-val">82</span>
+          </div>
+        </div>
+
+        <button class="btn-action" id="btn-resize-run" disabled>
+          <span>Resize & Download</span>
+        </button>
+
+        <div class="msg-box" id="resize-msg"></div>
+      </div>
+    </main>
+
+    <!-- TAB 3: INSPECT -->
+    <main class="tab-panel" id="tab-inspect">
+      <div class="card">
+        <div id="inspect-empty" style="text-align: center; color: var(--text-muted); padding: 20px 0;">
+          Select an image above to inspect metadata, geometry, and color profile.
+        </div>
+
+        <div id="inspect-result" style="display: none;">
+          <div style="font-weight: 600; font-size: 14px; margin-bottom: 10px;">File Inspection Report</div>
+          <div class="spec-grid" id="inspect-specs">
+            <!-- Populated via JS -->
+          </div>
+        </div>
+
+        <div class="msg-box" id="inspect-msg"></div>
+      </div>
+    </main>
+
+    <!-- TAB 4: SYSTEM & CAPABILITIES -->
+    <main class="tab-panel" id="tab-system">
+      <div class="card">
+        <div class="form-label" style="margin-bottom: 12px;">Engines & Capabilities</div>
+        <div class="cap-grid">
+          <div class="cap-box">
+            <div class="cap-header">
+              <span class="cap-name">CORE Engine</span>
+              <span class="badge-installed">Installed</span>
+            </div>
+            <div class="cap-desc">Job execution, safe tempfile swapping, atomic pipeline</div>
+          </div>
+          <div class="cap-box">
+            <div class="cap-header">
+              <span class="cap-name">IMAGE Engine</span>
+              <span class="badge-installed">Installed</span>
+            </div>
+            <div class="cap-desc">PNG, JPEG, WebP, GIF, BMP, TIFF (EXIF upright decode)</div>
+          </div>
+          <div class="cap-box">
+            <div class="cap-header">
+              <span class="cap-name">PDF Engine</span>
+              <span class="badge-planned">Planned M3</span>
+            </div>
+            <div class="cap-desc">qpdf adapter: inspect, merge, extract pages</div>
+          </div>
+          <div class="cap-box">
+            <div class="cap-header">
+              <span class="cap-name">MEDIA Engine</span>
+              <span class="badge-planned">Planned M4</span>
+            </div>
+            <div class="cap-desc">FFmpeg adapter: audio stream conversion, video operations</div>
+          </div>
+        </div>
+
+        <div class="form-label" style="margin-top: 24px; margin-bottom: 8px;">Registered Operations Matrix</div>
+        <table class="ops-table">
+          <thead>
+            <tr>
+              <th>Operation</th>
+              <th>Summary</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="ops-table-body">
+            <!-- Populated via /api/capabilities -->
+          </tbody>
+        </table>
+      </div>
+    </main>
+
+    <footer>
+      <span>FoldShift • Convert files. Keep them yours. • MIT License</span>
+    </footer>
+  </div>
+
+  <script>
+    // State
+    let currentFile = null;
+    let selectedConvertFormat = 'webp';
+    let selectedResizeFormat = '';
+
+    // Elements
+    const dropzone = document.getElementById('dropzone');
+    const fileInput = document.getElementById('file-input');
+    const fileBar = document.getElementById('file-bar');
+    const fileNameEl = document.getElementById('file-name');
+    const fileSpecsEl = document.getElementById('file-specs');
+    const filePreview = document.getElementById('file-preview');
+    const btnClear = document.getElementById('btn-clear');
+
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const tabPanels = document.querySelectorAll('.tab-panel');
+
+    // Tab Navigation
+    tabBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        tabBtns.forEach(b => b.classList.remove('active'));
+        tabPanels.forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        const target = document.getElementById(btn.dataset.tab);
+        if (target) target.classList.add('active');
+
+        // If inspecting tab clicked and file present, re-run inspection if needed
+        if (btn.dataset.tab === 'tab-inspect' && currentFile) {
+          inspectFile(currentFile);
+        }
+      });
+    });
+
+    // File Handling
+    function handleSelectedFile(file) {
+      if (!file) return;
+      currentFile = file;
+
+      // Update UI bar
+      fileNameEl.textContent = file.name;
+      fileSpecsEl.textContent = formatBytes(file.size);
+      
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = e => { filePreview.src = e.target.result; };
+        reader.readAsDataURL(file);
+      } else {
+        filePreview.src = '';
+      }
+
+      dropzone.style.display = 'none';
+      fileBar.style.display = 'flex';
+
+      document.getElementById('btn-convert-run').disabled = false;
+      document.getElementById('btn-resize-run').disabled = false;
+
+      // Trigger instant inspect
+      inspectFile(file);
+    }
+
+    function clearFile() {
+      currentFile = null;
+      fileInput.value = '';
+      dropzone.style.display = 'block';
+      fileBar.style.display = 'none';
+      document.getElementById('btn-convert-run').disabled = true;
+      document.getElementById('btn-resize-run').disabled = true;
+      document.getElementById('inspect-result').style.display = 'none';
+      document.getElementById('inspect-empty').style.display = 'block';
+      hideMsg('convert-msg');
+      hideMsg('resize-msg');
+      hideMsg('inspect-msg');
+    }
+
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files.length) handleSelectedFile(e.target.files[0]);
+    });
+
+    btnClear.addEventListener('click', clearFile);
+
+    // Drag and Drop
+    ['dragenter', 'dragover'].forEach(name => {
+      dropzone.addEventListener(name, (e) => {
+        e.preventDefault();
+        dropzone.classList.add('dragover');
+      });
+    });
+
+    ['dragleave', 'drop'].forEach(name => {
+      dropzone.addEventListener(name, (e) => {
+        e.preventDefault();
+        dropzone.classList.remove('dragover');
+      });
+    });
+
+    dropzone.addEventListener('drop', (e) => {
+      if (e.dataTransfer.files.length) {
+        handleSelectedFile(e.dataTransfer.files[0]);
+      }
+    });
+
+    // Format buttons for Convert
+    document.querySelectorAll('#convert-formats .format-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#convert-formats .format-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        selectedConvertFormat = btn.dataset.fmt;
+        const qGroup = document.getElementById('convert-quality-group');
+        qGroup.style.display = (selectedConvertFormat === 'jpg') ? 'block' : 'none';
+      });
+    });
+
+    // Format buttons for Resize
+    document.querySelectorAll('#resize-formats .format-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#resize-formats .format-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        selectedResizeFormat = btn.dataset.fmt;
+        const qGroup = document.getElementById('resize-quality-group');
+        qGroup.style.display = (selectedResizeFormat === 'jpg') ? 'block' : 'none';
+      });
+    });
+
+    // Sliders
+    const cq = document.getElementById('convert-quality');
+    const cqv = document.getElementById('convert-quality-val');
+    cq.addEventListener('input', () => { cqv.textContent = cq.value; });
+
+    const rq = document.getElementById('resize-quality');
+    const rqv = document.getElementById('resize-quality-val');
+    rq.addEventListener('input', () => { rqv.textContent = rq.value; });
+
+    // Helpers
+    function formatBytes(bytes) {
+      if (bytes === 0) return '0 Bytes';
+      const k = 1024;
+      const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    function showMsg(id, type, text) {
+      const el = document.getElementById(id);
+      el.className = 'msg-box ' + type;
+      el.textContent = text;
+      el.style.display = 'block';
+    }
+
+    function hideMsg(id) {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    }
+
+    // Inspect Action
+    async function inspectFile(file) {
+      hideMsg('inspect-msg');
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const res = await fetch('/api/inspect', { method: 'POST', body: formData });
+        const data = await res.json();
+
+        if (!res.ok) {
+          showMsg('inspect-msg', 'error', data.error || 'Inspection failed');
+          return;
+        }
+
+        document.getElementById('inspect-empty').style.display = 'none';
+        const inspectResult = document.getElementById('inspect-result');
+        const specGrid = document.getElementById('inspect-specs');
+        specGrid.innerHTML = '';
+
+        const items = [
+          { key: 'File Format', val: data.format },
+          { key: 'Dimensions', val: `${data.properties.width} × ${data.properties.height} px` },
+          { key: 'Color Type', val: data.properties.color || 'Unknown' },
+          { key: 'Orientation', val: data.properties.orientation || 'NoTransforms' },
+          { key: 'File Size', val: `${formatBytes(data.bytes)} (${data.bytes.toLocaleString()} bytes)` },
+          { key: 'Media Kind', val: data.media_kind }
+        ];
+
+        items.forEach(item => {
+          const div = document.createElement('div');
+          div.className = 'spec-item';
+          div.innerHTML = `<div class="spec-key">${item.key}</div><div class="spec-val">${item.val}</div>`;
+          specGrid.appendChild(div);
+        });
+
+        inspectResult.style.display = 'block';
+      } catch (err) {
+        showMsg('inspect-msg', 'error', 'Network error or backend unreachable: ' + err.message);
+      }
+    }
+
+    // Convert Action
+    const btnConvert = document.getElementById('btn-convert-run');
+    btnConvert.addEventListener('click', async () => {
+      if (!currentFile) return;
+      hideMsg('convert-msg');
+      btnConvert.disabled = true;
+      btnConvert.innerHTML = '<span class="spinner"></span> <span>Processing locally...</span>';
+
+      const formData = new FormData();
+      formData.append('file', currentFile);
+      formData.append('format', selectedConvertFormat);
+      formData.append('quality', cq.value);
+
+      try {
+        const res = await fetch('/api/convert', { method: 'POST', body: formData });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({ error: 'Conversion failed' }));
+          showMsg('convert-msg', 'error', errData.error || 'Conversion failed');
+        } else {
+          const blob = await res.blob();
+          const disp = res.headers.get('content-disposition');
+          let downloadName = 'converted.' + selectedConvertFormat;
+          if (disp && disp.includes('filename=')) {
+            const match = disp.match(/filename="?([^"]+)"?/);
+            if (match && match[1]) downloadName = match[1];
+          }
+
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = downloadName;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+
+          showMsg('convert-msg', 'success', `Saved ${downloadName} (${formatBytes(blob.size)})`);
+        }
+      } catch (err) {
+        showMsg('convert-msg', 'error', 'Error: ' + err.message);
+      } finally {
+        btnConvert.disabled = false;
+        btnConvert.innerHTML = '<span>Convert & Download</span>';
+      }
+    });
+
+    // Resize Action
+    const btnResize = document.getElementById('btn-resize-run');
+    btnResize.addEventListener('click', async () => {
+      if (!currentFile) return;
+      const w = document.getElementById('resize-w').value;
+      const h = document.getElementById('resize-h').value;
+
+      if (!w && !h) {
+        showMsg('resize-msg', 'error', 'Please specify at least Width or Height');
+        return;
+      }
+
+      hideMsg('resize-msg');
+      btnResize.disabled = true;
+      btnResize.innerHTML = '<span class="spinner"></span> <span>Resizing locally...</span>';
+
+      const formData = new FormData();
+      formData.append('file', currentFile);
+      if (w) formData.append('width', w);
+      if (h) formData.append('height', h);
+      if (selectedResizeFormat) formData.append('format', selectedResizeFormat);
+      formData.append('quality', rq.value);
+
+      try {
+        const res = await fetch('/api/resize', { method: 'POST', body: formData });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({ error: 'Resize failed' }));
+          showMsg('resize-msg', 'error', errData.error || 'Resize failed');
+        } else {
+          const blob = await res.blob();
+          const disp = res.headers.get('content-disposition');
+          let downloadName = 'resized.png';
+          if (disp && disp.includes('filename=')) {
+            const match = disp.match(/filename="?([^"]+)"?/);
+            if (match && match[1]) downloadName = match[1];
+          }
+
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = downloadName;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+
+          showMsg('resize-msg', 'success', `Saved ${downloadName} (${formatBytes(blob.size)})`);
+        }
+      } catch (err) {
+        showMsg('resize-msg', 'error', 'Error: ' + err.message);
+      } finally {
+        btnResize.disabled = false;
+        btnResize.innerHTML = '<span>Resize & Download</span>';
+      }
+    });
+
+    // Fetch Capabilities on load
+    async function loadCapabilities() {
+      try {
+        const res = await fetch('/api/capabilities');
+        if (!res.ok) return;
+        const data = await res.json();
+        
+        document.getElementById('version-badge').textContent = 'v' + data.version;
+
+        const tableBody = document.getElementById('ops-table-body');
+        tableBody.innerHTML = '';
+        data.capabilities.forEach(op => {
+          const tr = document.createElement('tr');
+          const statusBadge = op.available 
+            ? '<span class="badge-installed">available</span>' 
+            : '<span class="badge-planned">planned</span>';
+          tr.innerHTML = `
+            <td class="ops-id">${op.id}</td>
+            <td>${op.summary}</td>
+            <td>${statusBadge}</td>
+          `;
+          tableBody.appendChild(tr);
+        });
+      } catch (e) {
+        console.error('Failed to load capabilities', e);
+      }
+    }
+
+    loadCapabilities();
+  </script>
+</body>
+</html>

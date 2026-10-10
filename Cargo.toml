@@ -3,6 +3,7 @@ members = [
     "crates/foldshift-core",
     "crates/foldshift-image",
     "crates/foldshift-cli",
+    "crates/foldshift-web",
 ]
 resolver = "2"
 
@@ -15,6 +16,7 @@ rust-version = "1.88"
 
 [workspace.dependencies]
 anyhow = "1"
+axum = { version = "0.8", features = ["multipart"] }
 clap = { version = "4", features = ["derive"] }
 gif = { version = "0.14", default-features = false }
 image = { version = "0.25", default-features = false, features = [
@@ -31,6 +33,7 @@ serde_json = "1"
 thiserror = "2"
 tempfile = "3"
 tiff = { version = "0.11", default-features = false }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-util", "net"] }
 
 [profile.release]
 lto = "thin"

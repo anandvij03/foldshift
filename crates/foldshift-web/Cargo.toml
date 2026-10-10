@@ -1,0 +1,25 @@
+[package]
+name = "foldshift-web"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "foldshift-web"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+axum.workspace = true
+clap.workspace = true
+foldshift-core = { path = "../foldshift-core" }
+foldshift-image = { path = "../foldshift-image" }
+serde.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+image.workspace = true
