@@ -349,3 +349,139 @@ fn cli_same_file_policy_and_alias_preservation() {
     assert_eq!(data["properties"]["width"], 6);
     assert_eq!(data["properties"]["height"], 6);
 }
+
+#[test]
+fn cli_packs_list_shows_planned_engines_and_json_format() {
+    let result = Command::new(env!("CARGO_BIN_EXE_foldshift"))
+        .args(["packs", "list"])
+        .output()
+        .unwrap();
+    assert!(result.status.success());
+    let stdout = String::from_utf8_lossy(&result.stdout);
+    assert!(stdout.contains("Available capability packs:"));
+    assert!(stdout.contains("PDF    qpdf (QPDF Engine)"));
+    assert!(stdout.contains("MEDIA  media (Shared Media Engine)"));
+    assert!(stdout.contains("Packs directory:"));
+
+    let json_result = Command::new(env!("CARGO_BIN_EXE_foldshift"))
+        .args(["packs", "list", "--json"])
+        .output()
+        .unwrap();
+    assert!(json_result.status.success());
+    let data: Vec<serde_json::Value> = serde_json::from_slice(&json_result.stdout).unwrap();
+    assert_eq!(data.len(), 2);
+    let pdf_pack = data.iter().find(|p| p["capability"] == "pdf").unwrap();
+    assert_eq!(pdf_pack["id"], "qpdf");
+    assert_eq!(pdf_pack["installed"], false);
+}
+
+#[test]
+fn cli_dynamically_discovers_installed_pack_via_env() {
+    let dir = tempfile::tempdir().unwrap();
+    let packs_dir = dir.path();
+
+    // Verify baseline before pack installation
+    let res_before = Command::new(env!("CARGO_BIN_EXE_foldshift"))
+        .arg("capabilities")
+        .env("FOLDSHIFT_PACKS_DIR", packs_dir)
+        .output()
+        .unwrap();
+    let stdout_before = String::from_utf8_lossy(&res_before.stdout);
+    assert!(stdout_before.contains("PDF    not installed"));
+    assert!(stdout_before.contains("no   pdf.merge"));
+
+    // Create mock installed pack structure
+    let bin_dir = packs_dir.join("bin");
+    std::fs::create_dir_all(&bin_dir).unwrap();
+    let exe_path = bin_dir.join("qpdf.exe");
+    std::fs::write(&exe_path, b"mock-qpdf-binary").unwrap();
+
+    let manifest = foldshift_core::pack::PackManifest {
+        schema_version: "1.0.0".into(),
+        id: "qpdf".into(),
+        name: "QPDF Engine".into(),
+        version: "11.9.1".into(),
+        capability: "pdf".into(),
+        os: std::env::consts::OS.into(),
+        arch: std::env::consts::ARCH.into(),
+        abi: None,
+        core_version_requirement: Some(">=0.1.0".into()),
+        entrypoint: std::path::PathBuf::from("bin/qpdf.exe"),
+        download_bytes: 1_000,
+        unpacked_bytes: 2_000,
+        sha256: "0000000000000000000000000000000000000000000000000000000000000000".into(),
+        file_inventory: vec![foldshift_core::pack::PackFileEntry {
+            path: std::path::PathBuf::from("bin/qpdf.exe"),
+            bytes: 1_000,
+            sha256: None,
+        }],
+        license: "Apache-2.0".into(),
+        notice: None,
+        signature: None,
+        trusted_key_id: None,
+    };
+
+    let mut state = foldshift_core::pack::PackInstallState::new();
+    state.record_install(foldshift_core::pack::InstalledPack {
+        id: "qpdf".into(),
+        capability: "pdf".into(),
+        name: "QPDF Engine".into(),
+        version: "11.9.1".into(),
+        install_dir: packs_dir.to_path_buf(),
+        entrypoint: std::path::PathBuf::from("bin/qpdf.exe"),
+        installed_at: "2026-10-10T12:00:00Z".into(),
+        manifest,
+    });
+    state.save_to_dir(packs_dir).unwrap();
+
+    // Verify capabilities discovers the installed and healthy PDF pack
+    let res_after = Command::new(env!("CARGO_BIN_EXE_foldshift"))
+        .arg("capabilities")
+        .env("FOLDSHIFT_PACKS_DIR", packs_dir)
+        .output()
+        .unwrap();
+    assert!(res_after.status.success());
+    let stdout_after = String::from_utf8_lossy(&res_after.stdout);
+    assert!(stdout_after.contains("PDF    installed (QPDF Engine v11.9.1)"));
+    assert!(stdout_after.contains("yes  pdf.merge"));
+
+    let json_res = Command::new(env!("CARGO_BIN_EXE_foldshift"))
+        .args(["capabilities", "--json"])
+        .env("FOLDSHIFT_PACKS_DIR", packs_dir)
+        .output()
+        .unwrap();
+    assert!(json_res.status.success());
+    let json_ops: Vec<serde_json::Value> = serde_json::from_slice(&json_res.stdout).unwrap();
+    let pdf_op = json_ops.iter().find(|op| op["id"] == "pdf.merge").unwrap();
+    assert_eq!(pdf_op["available"], true);
+
+    // Verify packs list reflects installed health
+    let list_res = Command::new(env!("CARGO_BIN_EXE_foldshift"))
+        .args(["packs", "list"])
+        .env("FOLDSHIFT_PACKS_DIR", packs_dir)
+        .output()
+        .unwrap();
+    assert!(list_res.status.success());
+    let list_stdout = String::from_utf8_lossy(&list_res.stdout);
+    assert!(list_stdout.contains("installed (v11.9.1) [healthy]"));
+
+    // Corrupt the installation by removing the entrypoint binary
+    std::fs::remove_file(&exe_path).unwrap();
+
+    let res_corrupted = Command::new(env!("CARGO_BIN_EXE_foldshift"))
+        .arg("capabilities")
+        .env("FOLDSHIFT_PACKS_DIR", packs_dir)
+        .output()
+        .unwrap();
+    let stdout_corrupted = String::from_utf8_lossy(&res_corrupted.stdout);
+    assert!(stdout_corrupted.contains("PDF    not installed"));
+    assert!(stdout_corrupted.contains("no   pdf.merge"));
+
+    let list_corrupted = Command::new(env!("CARGO_BIN_EXE_foldshift"))
+        .args(["packs", "list"])
+        .env("FOLDSHIFT_PACKS_DIR", packs_dir)
+        .output()
+        .unwrap();
+    let list_corr_out = String::from_utf8_lossy(&list_corrupted.stdout);
+    assert!(list_corr_out.contains("corrupted / entrypoint missing [failed]"));
+}

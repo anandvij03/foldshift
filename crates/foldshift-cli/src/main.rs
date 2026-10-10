@@ -27,6 +27,11 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
+    /// Inspect or manage optional capability engine packs.
+    Packs {
+        #[command(subcommand)]
+        command: PacksCommand,
+    },
     /// Inspect a supported local file.
     #[cfg(feature = "image")]
     Inspect {
@@ -43,6 +48,16 @@ enum Command {
     Image {
         #[command(subcommand)]
         command: ImageCommand,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum PacksCommand {
+    /// List installed and available capability packs.
+    List {
+        /// Emit machine-readable JSON.
+        #[arg(long)]
+        json: bool,
     },
 }
 
@@ -96,6 +111,9 @@ fn run() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
         Command::Capabilities { json } => capabilities(json)?,
+        Command::Packs { command } => match command {
+            PacksCommand::List { json } => packs_list(json)?,
+        },
         #[cfg(feature = "image")]
         Command::Inspect { file, json } => inspect(file, json)?,
         #[cfg(feature = "image")]
@@ -113,8 +131,12 @@ fn run() -> Result<()> {
 
 fn capabilities(json: bool) -> Result<()> {
     let is_image_available = cfg!(feature = "image");
+    let is_pdf_available = foldshift_core::pack::is_capability_installed("pdf");
+    let is_media_available = foldshift_core::pack::is_capability_installed("media");
     let operations = foldshift_core::operations_with(|cap| match cap {
         "image" => is_image_available,
+        "pdf" => is_pdf_available,
+        "media" => is_media_available,
         _ => false,
     });
     if json {
@@ -130,13 +152,74 @@ fn capabilities(json: bool) -> Result<()> {
     );
     #[cfg(not(feature = "image"))]
     println!("IMAGE  not installed (optional feature disabled)");
-    println!("PDF    not installed (planned)");
-    println!("MEDIA  not installed (planned)");
+
+    if let Some(pdf_pack) = foldshift_core::pack::get_installed_engine("pdf") {
+        println!("PDF    installed ({} v{})", pdf_pack.name, pdf_pack.version);
+    } else {
+        println!("PDF    not installed (run 'foldshift packs list')");
+    }
+
+    if let Some(media_pack) = foldshift_core::pack::get_installed_engine("media") {
+        println!(
+            "MEDIA  installed ({} v{})",
+            media_pack.name, media_pack.version
+        );
+    } else {
+        println!("MEDIA  not installed (planned)");
+    }
+
     println!();
     for operation in operations {
         let marker = if operation.available { "yes" } else { "no " };
         println!("{marker}  {:<16} {}", operation.id, operation.summary);
     }
+    Ok(())
+}
+
+fn packs_list(json: bool) -> Result<()> {
+    let statuses = foldshift_core::pack::list_pack_statuses();
+    if json {
+        println!("{}", serde_json::to_string_pretty(&statuses)?);
+        return Ok(());
+    }
+
+    println!("Available capability packs:\n");
+    for status in &statuses {
+        let state_str = if status.installed {
+            if status.healthy {
+                format!(
+                    "installed (v{}) [healthy]",
+                    status.version.as_deref().unwrap_or("unknown")
+                )
+            } else {
+                "corrupted / entrypoint missing [failed]".to_string()
+            }
+        } else {
+            "not installed (planned)".to_string()
+        };
+
+        println!(
+            "{:<6} {} ({})",
+            status.capability.to_uppercase(),
+            status.id,
+            status.name
+        );
+        println!("       Status: {}", state_str);
+        println!("       Summary: {}", status.summary);
+        if let Some(entrypoint) = &status.entrypoint {
+            println!("       Entrypoint: {}", entrypoint.display());
+        }
+        if let Some(install_dir) = &status.install_dir {
+            println!("       Location: {}", install_dir.display());
+        }
+        println!();
+    }
+
+    println!(
+        "Packs directory: {}",
+        foldshift_core::pack::packs_dir().display()
+    );
+    println!("Run 'foldshift capabilities' to inspect active operations.");
     Ok(())
 }
 

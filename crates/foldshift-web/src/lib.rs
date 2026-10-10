@@ -73,10 +73,17 @@ async fn serve_index() -> Html<&'static str> {
 }
 
 async fn api_capabilities() -> Json<SystemStatus> {
+    let is_pdf_available = foldshift_core::pack::is_capability_installed("pdf");
+    let is_media_available = foldshift_core::pack::is_capability_installed("media");
     Json(SystemStatus {
         version: "0.1.0",
         supported_extensions: foldshift_image::SUPPORTED_EXTENSIONS,
-        capabilities: foldshift_core::operations_with(|cap| cap == "image"),
+        capabilities: foldshift_core::operations_with(|cap| match cap {
+            "image" => true,
+            "pdf" => is_pdf_available,
+            "media" => is_media_available,
+            _ => false,
+        }),
     })
 }
 

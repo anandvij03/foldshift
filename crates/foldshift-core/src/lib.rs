@@ -56,6 +56,8 @@ impl Inspection {
     }
 }
 
+pub mod pack;
+
 #[derive(Debug, Error)]
 pub enum FcError {
     #[error("input does not exist: {0}")]
@@ -74,6 +76,8 @@ pub enum FcError {
     Io(#[from] std::io::Error),
     #[error("conversion failed: {0}")]
     Conversion(String),
+    #[error("pack error: {0}")]
+    Pack(#[from] pack::PackError),
 }
 
 pub type Result<T> = std::result::Result<T, FcError>;
