@@ -217,3 +217,78 @@ async fn test_api_error_handling() {
     assert!(head2.starts_with("HTTP/1.1 422 Unprocessable Entity"));
     assert!(String::from_utf8_lossy(&resp_body2).contains("error"));
 }
+
+fn mock_qpdf_bin() -> std::path::PathBuf {
+    let mut path = std::env::current_exe().unwrap();
+    path.pop();
+    if path.ends_with("deps") {
+        path.pop();
+    }
+    path.join(if cfg!(windows) {
+        "mock-qpdf.exe"
+    } else {
+        "mock-qpdf"
+    })
+}
+
+fn create_sample_pdf(pages: u32) -> Vec<u8> {
+    format!(
+        "%PDF-1.7\n\
+        1 0 obj\n\
+        << /Type /Catalog /Pages 2 0 R >>\n\
+        endobj\n\
+        2 0 obj\n\
+        << /Type /Pages /Count {} >>\n\
+        endobj\n\
+        xref\n\
+        0 3\n\
+        0000000000 65535 f \n\
+        trailer\n\
+        << /Size 3 /Root 1 0 R >>\n\
+        startxref\n\
+        100\n\
+        %%EOF\n",
+        pages
+    )
+    .into_bytes()
+}
+
+#[tokio::test]
+async fn test_api_pdf_endpoints() {
+    let mock_path = mock_qpdf_bin();
+    unsafe { std::env::set_var("FOLDSHIFT_QPDF_PATH", &mock_path) };
+
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    tokio::spawn(async move {
+        axum::serve(listener, foldshift_web::app()).await.unwrap();
+    });
+
+    let pdf1 = create_sample_pdf(2);
+    let boundary = "BOUNDARYPDF";
+
+    // 1. Inspect PDF via /api/inspect
+    let inspect_body = build_multipart(boundary, Some(("file", "sample.pdf", &pdf1)), &[]);
+    let ct = format!("multipart/form-data; boundary={}", boundary);
+    let (head_insp, body_insp) =
+        send_request(addr, "POST", "/api/inspect", &ct, &inspect_body).await;
+    assert!(head_insp.starts_with("HTTP/1.1 200 OK"));
+    let insp_data: serde_json::Value = serde_json::from_slice(&body_insp).unwrap();
+    assert_eq!(insp_data["format"], "PDF");
+    assert_eq!(insp_data["properties"]["page_count"], 2);
+
+    // 2. Extract PDF via /api/pdf/extract
+    let extract_body = build_multipart(
+        boundary,
+        Some(("file", "sample.pdf", &pdf1)),
+        &[("pages", "1")],
+    );
+    let (head_ext, body_ext) =
+        send_request(addr, "POST", "/api/pdf/extract", &ct, &extract_body).await;
+    assert!(head_ext.starts_with("HTTP/1.1 200 OK"));
+    assert!(head_ext.contains("application/pdf"));
+    assert!(!body_ext.is_empty());
+
+    unsafe { std::env::remove_var("FOLDSHIFT_QPDF_PATH") };
+}

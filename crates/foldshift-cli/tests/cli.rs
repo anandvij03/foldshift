@@ -485,3 +485,175 @@ fn cli_dynamically_discovers_installed_pack_via_env() {
     let list_corr_out = String::from_utf8_lossy(&list_corrupted.stdout);
     assert!(list_corr_out.contains("corrupted / entrypoint missing [failed]"));
 }
+
+fn create_sample_pdf(pages: u32) -> Vec<u8> {
+    format!(
+        "%PDF-1.7\n\
+        1 0 obj\n\
+        << /Type /Catalog /Pages 2 0 R >>\n\
+        endobj\n\
+        2 0 obj\n\
+        << /Type /Pages /Count {} >>\n\
+        endobj\n\
+        xref\n\
+        0 3\n\
+        0000000000 65535 f \n\
+        trailer\n\
+        << /Size 3 /Root 1 0 R >>\n\
+        startxref\n\
+        100\n\
+        %%EOF\n",
+        pages
+    )
+    .into_bytes()
+}
+
+fn mock_qpdf_bin() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_BIN_EXE_foldshift"))
+        .parent()
+        .unwrap()
+        .join(if cfg!(windows) {
+            "mock-qpdf.exe"
+        } else {
+            "mock-qpdf"
+        })
+}
+
+#[test]
+fn cli_pdf_subcommands_reject_when_uninstalled() {
+    let dir = tempfile::tempdir().unwrap();
+    let pdf = dir.path().join("doc.pdf");
+    std::fs::write(&pdf, create_sample_pdf(1)).unwrap();
+    let out = dir.path().join("out.pdf");
+
+    // Clear any test overrides and packs dir
+    let res = Command::new(env!("CARGO_BIN_EXE_foldshift"))
+        .args(["pdf", "inspect"])
+        .arg(&pdf)
+        .env("FOLDSHIFT_PACKS_DIR", dir.path())
+        .env_remove("FOLDSHIFT_QPDF_PATH")
+        .output()
+        .unwrap();
+    assert!(!res.status.success());
+    let stderr = String::from_utf8_lossy(&res.stderr);
+    assert!(stderr.contains("pdf capability is not installed"));
+
+    let res_merge = Command::new(env!("CARGO_BIN_EXE_foldshift"))
+        .args(["pdf", "merge"])
+        .arg(&pdf)
+        .args(["-o"])
+        .arg(&out)
+        .env("FOLDSHIFT_PACKS_DIR", dir.path())
+        .env_remove("FOLDSHIFT_QPDF_PATH")
+        .output()
+        .unwrap();
+    assert!(!res_merge.status.success());
+    let stderr_m = String::from_utf8_lossy(&res_merge.stderr);
+    assert!(stderr_m.contains("pdf capability is not installed"));
+}
+
+#[test]
+fn cli_pdf_operations_succeed_with_configured_engine() {
+    let mock_path = mock_qpdf_bin();
+    let dir = tempfile::tempdir().unwrap();
+    let doc1 = dir.path().join("doc1.pdf");
+    let doc2 = dir.path().join("doc2.pdf");
+    let merged = dir.path().join("merged.pdf");
+    let extracted = dir.path().join("extracted.pdf");
+
+    std::fs::write(&doc1, create_sample_pdf(2)).unwrap();
+    std::fs::write(&doc2, create_sample_pdf(3)).unwrap();
+
+    // 1. Inspect
+    let insp_res = Command::new(env!("CARGO_BIN_EXE_foldshift"))
+        .args(["pdf", "inspect"])
+        .arg(&doc1)
+        .env("FOLDSHIFT_QPDF_PATH", &mock_path)
+        .output()
+        .unwrap();
+    assert!(insp_res.status.success());
+    let insp_out = String::from_utf8_lossy(&insp_res.stdout);
+    assert!(insp_out.contains("Page Count  2"));
+
+    // 2. Inspect with --json
+    let json_insp_res = Command::new(env!("CARGO_BIN_EXE_foldshift"))
+        .args(["pdf", "inspect", "--json"])
+        .arg(&doc1)
+        .env("FOLDSHIFT_QPDF_PATH", &mock_path)
+        .output()
+        .unwrap();
+    assert!(json_insp_res.status.success());
+    let json_val: serde_json::Value = serde_json::from_slice(&json_insp_res.stdout).unwrap();
+    assert_eq!(json_val["format"], "PDF");
+    assert_eq!(json_val["properties"]["page_count"], 2);
+
+    // 3. Merge
+    let merge_res = Command::new(env!("CARGO_BIN_EXE_foldshift"))
+        .args(["pdf", "merge"])
+        .arg(&doc1)
+        .arg(&doc2)
+        .args(["-o"])
+        .arg(&merged)
+        .env("FOLDSHIFT_QPDF_PATH", &mock_path)
+        .output()
+        .unwrap();
+    assert!(merge_res.status.success());
+    assert!(merged.exists());
+
+    let merged_insp = Command::new(env!("CARGO_BIN_EXE_foldshift"))
+        .args(["pdf", "inspect", "--json"])
+        .arg(&merged)
+        .env("FOLDSHIFT_QPDF_PATH", &mock_path)
+        .output()
+        .unwrap();
+    let merged_val: serde_json::Value = serde_json::from_slice(&merged_insp.stdout).unwrap();
+    assert_eq!(merged_val["properties"]["page_count"], 5);
+
+    // 4. Overwrite protection without --force
+    let merge_fail = Command::new(env!("CARGO_BIN_EXE_foldshift"))
+        .args(["pdf", "merge"])
+        .arg(&doc1)
+        .arg(&doc2)
+        .args(["-o"])
+        .arg(&merged)
+        .env("FOLDSHIFT_QPDF_PATH", &mock_path)
+        .output()
+        .unwrap();
+    assert!(!merge_fail.status.success());
+    let err_out = String::from_utf8_lossy(&merge_fail.stderr);
+    assert!(err_out.contains("output already exists"));
+
+    // 5. Extract
+    let extract_res = Command::new(env!("CARGO_BIN_EXE_foldshift"))
+        .args(["pdf", "extract"])
+        .arg(&merged)
+        .arg(&extracted)
+        .args(["--pages", "1-2"])
+        .env("FOLDSHIFT_QPDF_PATH", &mock_path)
+        .output()
+        .unwrap();
+    assert!(extract_res.status.success());
+    assert!(extracted.exists());
+
+    let extract_insp = Command::new(env!("CARGO_BIN_EXE_foldshift"))
+        .args(["pdf", "inspect", "--json"])
+        .arg(&extracted)
+        .env("FOLDSHIFT_QPDF_PATH", &mock_path)
+        .output()
+        .unwrap();
+    let ext_val: serde_json::Value = serde_json::from_slice(&extract_insp.stdout).unwrap();
+    assert_eq!(ext_val["properties"]["page_count"], 2);
+
+    // 6. Invalid page range rejection
+    let bad_range = Command::new(env!("CARGO_BIN_EXE_foldshift"))
+        .args(["pdf", "extract"])
+        .arg(&merged)
+        .arg(&extracted)
+        .args(["--pages", "0", "--force"])
+        .env("FOLDSHIFT_QPDF_PATH", &mock_path)
+        .output()
+        .unwrap();
+    assert!(!bad_range.status.success());
+    let bad_err = String::from_utf8_lossy(&bad_range.stderr);
+    assert!(bad_err.contains("pages are 1-indexed"));
+}

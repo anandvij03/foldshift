@@ -1,4 +1,3 @@
-#[cfg(feature = "image")]
 use std::path::PathBuf;
 
 use anyhow::Result;
@@ -32,6 +31,11 @@ enum Command {
         #[command(subcommand)]
         command: PacksCommand,
     },
+    /// PDF-specific operations.
+    Pdf {
+        #[command(subcommand)]
+        command: PdfCommand,
+    },
     /// Inspect a supported local file.
     #[cfg(feature = "image")]
     Inspect {
@@ -58,6 +62,42 @@ enum PacksCommand {
         /// Emit machine-readable JSON.
         #[arg(long)]
         json: bool,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum PdfCommand {
+    /// Inspect a PDF file's page count and structure.
+    Inspect {
+        file: PathBuf,
+        /// Emit machine-readable JSON.
+        #[arg(long)]
+        json: bool,
+    },
+    /// Merge multiple PDF documents into a single output file.
+    Merge {
+        /// Input PDF files to merge in order.
+        #[arg(required = true, num_args = 1..)]
+        inputs: Vec<PathBuf>,
+        /// Destination output file.
+        #[arg(short, long)]
+        output: PathBuf,
+        /// Replace an existing output file.
+        #[arg(long)]
+        force: bool,
+    },
+    /// Extract page ranges from a PDF document.
+    Extract {
+        /// Source PDF file.
+        input: PathBuf,
+        /// Destination output file.
+        output: PathBuf,
+        /// Page range to extract (e.g. '1-3', '1,5,7', '2').
+        #[arg(long)]
+        pages: String,
+        /// Replace an existing output file.
+        #[arg(long)]
+        force: bool,
     },
 }
 
@@ -113,6 +153,20 @@ fn run() -> Result<()> {
         Command::Capabilities { json } => capabilities(json)?,
         Command::Packs { command } => match command {
             PacksCommand::List { json } => packs_list(json)?,
+        },
+        Command::Pdf { command } => match command {
+            PdfCommand::Inspect { file, json } => pdf_inspect(file, json)?,
+            PdfCommand::Merge {
+                inputs,
+                output,
+                force,
+            } => pdf_merge(inputs, output, force)?,
+            PdfCommand::Extract {
+                input,
+                output,
+                pages,
+                force,
+            } => pdf_extract(input, output, pages, force)?,
         },
         #[cfg(feature = "image")]
         Command::Inspect { file, json } => inspect(file, json)?,
@@ -279,16 +333,59 @@ fn resize(args: ResizeArgs) -> Result<()> {
     Ok(())
 }
 
-#[cfg(feature = "image")]
-fn title_case(value: &str) -> String {
-    let mut characters = value.chars();
-    match characters.next() {
-        Some(first) => first.to_uppercase().collect::<String>() + characters.as_str(),
-        None => String::new(),
+fn pdf_inspect(file: PathBuf, json_output: bool) -> Result<()> {
+    let inspection = foldshift_pdf::inspect(&file)?;
+    if json_output {
+        println!("{}", serde_json::to_string_pretty(&inspection)?);
+    } else {
+        println!("File    {}", inspection.path.display());
+        println!("Type    {}", inspection.format);
+        println!("Size    {} bytes", inspection.bytes);
+        for (key, value) in inspection.properties {
+            println!("{:<12}{}", title_case(&key), plain_json(value));
+        }
     }
+    Ok(())
 }
 
-#[cfg(feature = "image")]
+fn pdf_merge(inputs: Vec<PathBuf>, output: PathBuf, force: bool) -> Result<()> {
+    foldshift_pdf::merge(&inputs, &output, foldshift_pdf::MergeOptions { force })?;
+    println!("Merged {} files -> {}", inputs.len(), output.display());
+    Ok(())
+}
+
+fn pdf_extract(input: PathBuf, output: PathBuf, pages: String, force: bool) -> Result<()> {
+    foldshift_pdf::extract(
+        &input,
+        &output,
+        foldshift_pdf::ExtractOptions {
+            force,
+            pages: pages.clone(),
+        },
+    )?;
+    println!(
+        "Extracted pages {} from {} -> {}",
+        pages,
+        input.display(),
+        output.display()
+    );
+    Ok(())
+}
+
+fn title_case(value: &str) -> String {
+    value
+        .split('_')
+        .map(|segment| {
+            let mut characters = segment.chars();
+            match characters.next() {
+                Some(first) => first.to_uppercase().collect::<String>() + characters.as_str(),
+                None => String::new(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 fn plain_json(value: serde_json::Value) -> String {
     match value {
         serde_json::Value::String(value) => value,

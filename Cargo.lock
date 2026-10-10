@@ -296,6 +296,7 @@ dependencies = [
  "clap",
  "foldshift-core",
  "foldshift-image",
+ "foldshift-pdf",
  "gif",
  "image",
  "serde_json",
@@ -327,6 +328,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "foldshift-pdf"
+version = "0.1.0"
+dependencies = [
+ "foldshift-core",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+]
+
+[[package]]
 name = "foldshift-web"
 version = "0.1.0"
 dependencies = [
@@ -335,6 +347,7 @@ dependencies = [
  "clap",
  "foldshift-core",
  "foldshift-image",
+ "foldshift-pdf",
  "image",
  "serde",
  "serde_json",

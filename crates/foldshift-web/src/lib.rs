@@ -28,6 +28,8 @@ pub fn app() -> Router {
         .route("/api/inspect", post(api_inspect))
         .route("/api/convert", post(api_convert))
         .route("/api/resize", post(api_resize))
+        .route("/api/pdf/merge", post(api_pdf_merge))
+        .route("/api/pdf/extract", post(api_pdf_extract))
         .layer(DefaultBodyLimit::max(100 * 102_400)) // 100 MB limit
 }
 
@@ -136,12 +138,24 @@ async fn api_inspect(
         )
     })?;
 
-    let inspection = foldshift_image::inspect(temp_file.path()).map_err(|e| {
-        (
-            StatusCode::UNPROCESSABLE_ENTITY,
-            Json(json!({ "error": e.to_string() })),
-        )
-    })?;
+    let inspection = if ext.eq_ignore_ascii_case("pdf") {
+        foldshift_pdf::inspect(temp_file.path()).map_err(|e| {
+            let status = match e {
+                foldshift_core::FcError::CapabilityUnavailable(_) => {
+                    StatusCode::SERVICE_UNAVAILABLE
+                }
+                _ => StatusCode::UNPROCESSABLE_ENTITY,
+            };
+            (status, Json(json!({ "error": e.to_string() })))
+        })?
+    } else {
+        foldshift_image::inspect(temp_file.path()).map_err(|e| {
+            (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?
+    };
 
     let mut modified = inspection;
     modified.path = PathBuf::from(filename);
@@ -427,6 +441,180 @@ async fn api_resize(
     response.headers_mut().insert(
         header::CONTENT_TYPE,
         HeaderValue::from_str(mime_type).unwrap(),
+    );
+    response.headers_mut().insert(
+        header::CONTENT_DISPOSITION,
+        HeaderValue::from_str(&format!("attachment; filename=\"{}\"", download_name)).unwrap(),
+    );
+
+    Ok(response)
+}
+
+async fn api_pdf_merge(
+    mut multipart: Multipart,
+) -> Result<Response, (StatusCode, Json<serde_json::Value>)> {
+    let mut files = Vec::new();
+
+    while let Ok(Some(field)) = multipart.next_field().await {
+        let name = field.name().unwrap_or_default().to_string();
+        if name == "files" || name == "file" {
+            let filename = field.file_name().unwrap_or("unnamed.pdf").to_string();
+            let bytes = field.bytes().await.map_err(|e| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({ "error": format!("Failed reading file bytes: {}", e) })),
+                )
+            })?;
+            files.push((filename, bytes.to_vec()));
+        }
+    }
+
+    if files.is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "No PDF files uploaded" })),
+        ));
+    }
+
+    let temp_dir = tempfile::tempdir().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    let mut input_paths = Vec::new();
+    for (i, (_name, bytes)) in files.iter().enumerate() {
+        let in_path = temp_dir.path().join(format!("input_{}.pdf", i));
+        std::fs::write(&in_path, bytes).map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?;
+        input_paths.push(in_path);
+    }
+
+    let output_path = temp_dir.path().join("merged.pdf");
+    foldshift_pdf::merge(
+        &input_paths,
+        &output_path,
+        foldshift_pdf::MergeOptions { force: true },
+    )
+    .map_err(|e| {
+        let status = match e {
+            foldshift_core::FcError::CapabilityUnavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
+            _ => StatusCode::UNPROCESSABLE_ENTITY,
+        };
+        (status, Json(json!({ "error": e.to_string() })))
+    })?;
+
+    let out_bytes = std::fs::read(&output_path).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    let mut response = out_bytes.into_response();
+    response.headers_mut().insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("application/pdf"),
+    );
+    response.headers_mut().insert(
+        header::CONTENT_DISPOSITION,
+        HeaderValue::from_static("attachment; filename=\"merged.pdf\""),
+    );
+
+    Ok(response)
+}
+
+async fn api_pdf_extract(
+    mut multipart: Multipart,
+) -> Result<Response, (StatusCode, Json<serde_json::Value>)> {
+    let mut file_bytes: Option<(String, Vec<u8>)> = None;
+    let mut pages_spec: Option<String> = None;
+
+    while let Ok(Some(field)) = multipart.next_field().await {
+        let name = field.name().unwrap_or_default().to_string();
+        if name == "file" {
+            let filename = field.file_name().unwrap_or("unnamed.pdf").to_string();
+            let bytes = field.bytes().await.map_err(|e| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({ "error": format!("Failed reading file bytes: {}", e) })),
+                )
+            })?;
+            file_bytes = Some((filename, bytes.to_vec()));
+        } else if name == "pages" {
+            pages_spec = field.text().await.ok();
+        }
+    }
+
+    let (filename, bytes) = file_bytes.ok_or_else(|| {
+        (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "No file field uploaded" })),
+        )
+    })?;
+
+    let pages = pages_spec.ok_or_else(|| {
+        (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "Missing 'pages' parameter" })),
+        )
+    })?;
+
+    let temp_dir = tempfile::tempdir().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    let in_path = temp_dir.path().join("input.pdf");
+    std::fs::write(&in_path, &bytes).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    let output_path = temp_dir.path().join("extracted.pdf");
+    foldshift_pdf::extract(
+        &in_path,
+        &output_path,
+        foldshift_pdf::ExtractOptions {
+            force: true,
+            pages: pages.clone(),
+        },
+    )
+    .map_err(|e| {
+        let status = match e {
+            foldshift_core::FcError::CapabilityUnavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
+            _ => StatusCode::UNPROCESSABLE_ENTITY,
+        };
+        (status, Json(json!({ "error": e.to_string() })))
+    })?;
+
+    let out_bytes = std::fs::read(&output_path).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    let stem = Path::new(&filename)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("document");
+    let safe_pages = pages.replace(',', "_");
+    let download_name = format!("{}_pages_{}.pdf", stem, safe_pages);
+
+    let mut response = out_bytes.into_response();
+    response.headers_mut().insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("application/pdf"),
     );
     response.headers_mut().insert(
         header::CONTENT_DISPOSITION,

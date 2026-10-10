@@ -107,8 +107,20 @@ pub fn operations_with(mut is_available: impl FnMut(&str) -> bool) -> Vec<Operat
             available: is_available("image"),
         },
         OperationInfo {
+            id: "pdf.inspect".into(),
+            summary: "Inspect PDF document structure and page count".into(),
+            capability: "pdf".into(),
+            available: is_available("pdf"),
+        },
+        OperationInfo {
             id: "pdf.merge".into(),
             summary: "Merge PDF documents".into(),
+            capability: "pdf".into(),
+            available: is_available("pdf"),
+        },
+        OperationInfo {
+            id: "pdf.extract".into(),
+            summary: "Extract page ranges from a PDF document".into(),
             capability: "pdf".into(),
             available: is_available("pdf"),
         },

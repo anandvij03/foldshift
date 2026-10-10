@@ -38,7 +38,7 @@ no external agent has been started by this document.
 | M2 | FS-011 | Core/Images artifacts, download chooser, size manifest | Antigravity | FS-010 | Merged |
 | M2 | FS-012 | Verify minimal dependencies, both profiles and packages | Codex review | FS-011 | Merged |
 | M3: optional PDF | FS-020 | Versioned engine/pack contract and install state | Antigravity | M2 | Merged |
-| M3 | FS-021 | qpdf adapter: inspect, merge, extract pages | Antigravity | FS-020 | Queued |
+| M3 | FS-021 | qpdf adapter: inspect, merge, extract pages | Antigravity | FS-020 | Merged |
 | M3 | FS-022 | Verified pack install/update/remove and offline import | Antigravity | FS-020 | Queued |
 | M3 | FS-023 | Review process limits, recovery and license notices | Codex review | FS-021/022 | Queued |
 | M4: batch/media | FS-030 | Sequential batches, names, progress and cancellation | Antigravity | M2 | Queued |
