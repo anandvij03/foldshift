@@ -257,3 +257,42 @@ fn cli_rejects_transparency_for_jpeg_and_allows_opaque_alpha() {
     assert!(res.status.success());
     assert!(opaque_out.exists());
 }
+
+#[test]
+fn cli_same_file_policy_and_alias_preservation() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("source.png");
+    image::DynamicImage::new_rgb8(12, 12).save(&file).unwrap();
+    let initial_bytes = std::fs::read(&file).unwrap();
+
+    // 1. Without --force, in-place convert fails with OutputExists
+    let res = Command::new(env!("CARGO_BIN_EXE_foldshift"))
+        .args(["convert"])
+        .arg(&file)
+        .arg(&file)
+        .output()
+        .unwrap();
+    assert!(!res.status.success());
+    let stderr = String::from_utf8_lossy(&res.stderr);
+    assert!(stderr.contains("output already exists"));
+    assert_eq!(std::fs::read(&file).unwrap(), initial_bytes);
+
+    // 2. With --force, in-place resize succeeds
+    let res = Command::new(env!("CARGO_BIN_EXE_foldshift"))
+        .args(["image", "resize"])
+        .arg(&file)
+        .arg(&file)
+        .args(["--width", "6", "--force"])
+        .output()
+        .unwrap();
+    assert!(res.status.success());
+    let inspect_res = Command::new(env!("CARGO_BIN_EXE_foldshift"))
+        .args(["inspect", "--json"])
+        .arg(&file)
+        .output()
+        .unwrap();
+    assert!(inspect_res.status.success());
+    let data: serde_json::Value = serde_json::from_slice(&inspect_res.stdout).unwrap();
+    assert_eq!(data["properties"]["width"], 6);
+    assert_eq!(data["properties"]["height"], 6);
+}

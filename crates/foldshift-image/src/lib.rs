@@ -52,19 +52,13 @@ pub fn inspect(path: &Path) -> Result<Inspection> {
     let color_type = decoder.color_type();
     let metadata = fs::metadata(path)?;
 
-    let mut properties = std::collections::BTreeMap::new();
-    properties.insert("width".into(), json!(width));
-    properties.insert("height".into(), json!(height));
-    properties.insert("color".into(), json!(format!("{:?}", color_type)));
-    properties.insert("orientation".into(), json!(format!("{:?}", orientation)));
-
-    Ok(Inspection {
-        path: path.to_path_buf(),
-        format: format_name(format).into(),
-        media_kind: MediaKind::Image,
-        bytes: metadata.len(),
-        properties,
-    })
+    Ok(
+        Inspection::new(path, format_name(format), MediaKind::Image, metadata.len())
+            .with_property("width", json!(width))
+            .with_property("height", json!(height))
+            .with_property("color", json!(format!("{:?}", color_type)))
+            .with_property("orientation", json!(format!("{:?}", orientation))),
+    )
 }
 
 pub fn convert(input: &Path, output: &Path, options: EncodeOptions) -> Result<()> {
@@ -962,5 +956,61 @@ mod tests {
         assert!(has_transparent_pixels(&DynamicImage::ImageLumaA8(
             luma_a_trans
         )));
+    }
+
+    #[test]
+    fn same_file_policy_and_alias_preservation() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("in_place.png");
+        let initial_img = DynamicImage::new_rgb8(10, 10);
+        initial_img.save(&file).unwrap();
+        let initial_bytes = fs::read(&file).unwrap();
+
+        // 1. Same-file conversion without force must fail with OutputExists
+        let res = convert(&file, &file, EncodeOptions::default());
+        assert!(matches!(res, Err(FcError::OutputExists(_))));
+        assert_eq!(fs::read(&file).unwrap(), initial_bytes);
+
+        // 2. Same-file alias (e.g. ./in_place.png) without force must fail with OutputExists
+        let alias = dir.path().join(".").join("in_place.png");
+        let res = convert(&file, &alias, EncodeOptions::default());
+        assert!(matches!(res, Err(FcError::OutputExists(_))));
+        assert_eq!(fs::read(&file).unwrap(), initial_bytes);
+
+        // 3. Same-file resize with force succeeds atomically
+        let resize_res = resize(
+            &file,
+            &file,
+            Some(5),
+            None,
+            EncodeOptions {
+                force: true,
+                ..Default::default()
+            },
+        );
+        assert_eq!(resize_res.unwrap(), (5, 5));
+        let decoded = decode(&file).unwrap();
+        assert_eq!(decoded.dimensions(), (5, 5));
+
+        // 4. Same-file conversion with force that fails encoding preserves the original file
+        let transparent_file = dir.path().join("transparent.png");
+        let mut img = image::RgbaImage::from_pixel(4, 4, image::Rgba([100, 150, 200, 255]));
+        img.put_pixel(0, 0, image::Rgba([100, 150, 200, 0])); // transparent pixel
+        DynamicImage::ImageRgba8(img)
+            .save(&transparent_file)
+            .unwrap();
+        let trans_before = fs::read(&transparent_file).unwrap();
+
+        // Trying to convert transparent.png to transparent.jpg in-place or invalid options
+        let err = convert(
+            &transparent_file,
+            &transparent_file,
+            EncodeOptions {
+                quality: 101, // invalid quality
+                force: true,
+            },
+        );
+        assert!(matches!(err, Err(FcError::InvalidOption(_))));
+        assert_eq!(fs::read(&transparent_file).unwrap(), trans_before);
     }
 }

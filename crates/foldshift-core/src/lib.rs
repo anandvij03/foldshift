@@ -16,36 +16,6 @@ pub enum MediaKind {
     Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Format {
-    pub name: String,
-    pub extension: String,
-    pub media_kind: MediaKind,
-}
-
-impl Format {
-    pub fn new(
-        name: impl Into<String>,
-        extension: impl Into<String>,
-        media_kind: MediaKind,
-    ) -> Self {
-        Self {
-            name: name.into(),
-            extension: extension.into(),
-            media_kind,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Job {
-    pub operation: String,
-    pub inputs: Vec<PathBuf>,
-    pub output: Option<PathBuf>,
-    #[serde(default)]
-    pub options: BTreeMap<String, Value>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OperationInfo {
     pub id: String,
@@ -62,6 +32,28 @@ pub struct Inspection {
     pub bytes: u64,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub properties: BTreeMap<String, Value>,
+}
+
+impl Inspection {
+    pub fn new(
+        path: impl Into<PathBuf>,
+        format: impl Into<String>,
+        media_kind: MediaKind,
+        bytes: u64,
+    ) -> Self {
+        Self {
+            path: path.into(),
+            format: format.into(),
+            media_kind,
+            bytes,
+            properties: BTreeMap::new(),
+        }
+    }
+
+    pub fn with_property(mut self, key: impl Into<String>, value: Value) -> Self {
+        self.properties.insert(key.into(), value);
+        self
+    }
 }
 
 #[derive(Debug, Error)]
@@ -132,5 +124,22 @@ mod tests {
         ids.sort_unstable();
         ids.dedup();
         assert_eq!(ids.len(), items.len());
+    }
+
+    #[test]
+    fn inspection_builder_and_serialization() {
+        let insp = Inspection::new(PathBuf::from("test.png"), "PNG", MediaKind::Image, 1024)
+            .with_property("width", serde_json::json!(100))
+            .with_property("height", serde_json::json!(200));
+
+        assert_eq!(insp.format, "PNG");
+        assert_eq!(insp.media_kind, MediaKind::Image);
+        assert_eq!(insp.bytes, 1024);
+        assert_eq!(insp.properties.get("width").unwrap(), &100);
+        assert_eq!(insp.properties.get("height").unwrap(), &200);
+
+        let json = serde_json::to_string(&insp).unwrap();
+        assert!(json.contains("\"media_kind\":\"image\""));
+        assert!(json.contains("\"width\":100"));
     }
 }
