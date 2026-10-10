@@ -31,7 +31,7 @@ no external agent has been started by this document.
 | Milestone | ID | Work | Implementation | Depends on | State |
 |---|---|---|---|---|---|
 | M1: reliable images | FS-001 | Guard animation/page loss; validate requests early | Antigravity | None | Merged |
-| M1 | FS-002 | Explicit orientation, color, transparency and quality rules | Antigravity | FS-001 review | Queued |
+| M1 | FS-002 | Explicit orientation, color, transparency and quality rules | Antigravity | FS-001 review | Review |
 | M1 | FS-003 | Reduce inspection allocations; measure size and memory | Codex cleanup | FS-001 handoff | Queued |
 | M1 | FS-004 | Consolidate metadata; remove/defer unused abstraction | Codex cleanup | FS-002/003 | Queued |
 | M2: selectable downloads | FS-010 | Optional image feature and accurate capability reporting | Antigravity | M1 | Queued |
