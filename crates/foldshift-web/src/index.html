@@ -8,11 +8,12 @@
     :root {
       --bg: #090a0f;
       --surface: #12141a;
-      --surface-2: #191c24;
-      --border: #242834;
-      --border-focus: #3d4456;
+      --surface-2: #181b23;
+      --surface-3: #202430;
+      --border: #252937;
+      --border-focus: #3e455c;
       --text: #e2e4ea;
-      --text-muted: #838a9e;
+      --text-muted: #82899d;
       --accent: #3b82f6;
       --accent-hover: #2563eb;
       --accent-subtle: rgba(59, 130, 246, 0.12);
@@ -46,21 +47,23 @@
 
     .container {
       width: 100%;
-      max-width: 780px;
+      max-width: 1100px;
       margin: 0 auto;
-      padding: 32px 20px 48px;
+      padding: 24px 20px 48px;
     }
 
     /* Header */
     header {
-      margin-bottom: 24px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 16px;
     }
 
     .brand-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }
 
     .brand-title {
@@ -109,24 +112,76 @@
       font-size: 13px;
     }
 
-    /* Navigation Tabs */
-    .tabs {
+    /* Top-Level Domain Switcher (Separates Images, PDFs, System) */
+    .domain-tabs {
       display: flex;
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 8px;
-      padding: 3px;
-      gap: 3px;
+      padding: 4px;
+      gap: 4px;
       margin-bottom: 20px;
     }
 
-    .tab-btn {
+    .domain-btn {
       flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
       background: transparent;
       border: none;
       color: var(--text-muted);
-      padding: 8px 10px;
+      padding: 10px 14px;
       font-size: 13px;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      font-family: inherit;
+    }
+
+    .domain-btn:hover {
+      color: var(--text);
+    }
+
+    .domain-btn.active {
+      background: var(--surface-2);
+      color: #fff;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    }
+
+    .domain-tag {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border);
+      padding: 1px 6px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      font-weight: 500;
+    }
+
+    .domain-btn.active .domain-tag {
+      border-color: rgba(59, 130, 246, 0.4);
+      background: var(--accent-subtle);
+      color: var(--accent);
+    }
+
+    /* Sub-navigation inside domain */
+    .subnav {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+
+    .subnav-btn {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 6px 14px;
+      font-size: 12px;
       font-weight: 500;
       border-radius: 6px;
       cursor: pointer;
@@ -134,23 +189,38 @@
       font-family: inherit;
     }
 
-    .tab-btn:hover {
+    .subnav-btn:hover {
       color: var(--text);
+      border-color: var(--border-focus);
     }
 
-    .tab-btn.active {
-      background: var(--surface-2);
+    .subnav-btn.active {
+      background: var(--surface-3);
+      border-color: var(--accent);
       color: #fff;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
     }
 
-    /* Card */
+    /* Layout Cards */
     .card {
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 10px;
-      padding: 22px;
+      padding: 20px;
       margin-bottom: 20px;
+    }
+
+    /* Two-column layout for side-by-side preview */
+    .split-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+
+    @media (max-width: 860px) {
+      .split-layout {
+        grid-template-columns: 1fr;
+      }
     }
 
     /* Dropzone */
@@ -158,7 +228,7 @@
       border: 1.5px dashed var(--border);
       background: var(--surface-2);
       border-radius: 8px;
-      padding: 30px 20px;
+      padding: 24px 16px;
       text-align: center;
       cursor: pointer;
       transition: all 0.15s ease;
@@ -180,18 +250,19 @@
     }
 
     .dropzone-icon {
-      font-size: 24px;
-      margin-bottom: 6px;
+      font-size: 20px;
+      margin-bottom: 4px;
       color: var(--text-muted);
     }
 
     .dropzone-title {
-      font-weight: 500;
-      margin-bottom: 4px;
+      font-weight: 600;
+      font-size: 13px;
+      margin-bottom: 3px;
     }
 
     .dropzone-hint {
-      font-size: 12px;
+      font-size: 11px;
       color: var(--text-muted);
       font-family: var(--font-mono);
     }
@@ -204,8 +275,8 @@
       background: var(--surface-2);
       border: 1px solid var(--border);
       border-radius: 8px;
-      padding: 12px 16px;
-      margin-bottom: 20px;
+      padding: 10px 14px;
+      margin-bottom: 16px;
     }
 
     .file-info {
@@ -216,8 +287,8 @@
     }
 
     .file-thumb {
-      width: 44px;
-      height: 44px;
+      width: 40px;
+      height: 40px;
       border-radius: 4px;
       object-fit: cover;
       background: #000;
@@ -242,7 +313,7 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      max-width: 450px;
+      max-width: 400px;
     }
 
     .file-specs {
@@ -267,40 +338,9 @@
       border-color: var(--border-focus);
     }
 
-    /* Sub Tabs (for PDF Tools) */
-    .subtabs {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 18px;
-    }
-
-    .subtab-btn {
-      background: var(--surface-2);
-      border: 1px solid var(--border);
-      color: var(--text-muted);
-      padding: 6px 14px;
-      font-size: 12px;
-      font-weight: 500;
-      border-radius: 6px;
-      cursor: pointer;
-      font-family: inherit;
-      transition: all 0.15s ease;
-    }
-
-    .subtab-btn:hover {
-      color: var(--text);
-      border-color: var(--border-focus);
-    }
-
-    .subtab-btn.active {
-      border-color: var(--accent);
-      background: var(--accent-subtle);
-      color: #fff;
-    }
-
     /* Form Controls */
     .form-group {
-      margin-bottom: 18px;
+      margin-bottom: 16px;
     }
 
     .form-label {
@@ -329,7 +369,7 @@
       background: var(--surface-2);
       border: 1px solid var(--border);
       color: var(--text);
-      padding: 10px 4px;
+      padding: 9px 4px;
       border-radius: 6px;
       font-family: var(--font-mono);
       font-size: 12px;
@@ -398,16 +438,17 @@
     .form-hint {
       font-size: 12px;
       color: var(--text-muted);
-      margin-top: 6px;
+      margin-top: 5px;
     }
 
-    /* List for multiple files (PDF Merge) */
+    /* Multiple File List (for PDF Merge) */
     .file-list {
       display: flex;
       flex-direction: column;
       gap: 6px;
+      margin-top: 10px;
       margin-bottom: 16px;
-      max-height: 220px;
+      max-height: 240px;
       overflow-y: auto;
     }
 
@@ -420,6 +461,26 @@
       border-radius: 6px;
       padding: 8px 12px;
       font-size: 12px;
+      cursor: pointer;
+      transition: border-color 0.15s ease;
+    }
+
+    .file-item:hover, .file-item.selected {
+      border-color: var(--accent);
+    }
+
+    .file-item-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      overflow: hidden;
+    }
+
+    .file-item-num {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--accent);
+      font-weight: 600;
     }
 
     .file-item-name {
@@ -428,7 +489,7 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      max-width: 500px;
+      max-width: 340px;
     }
 
     .file-item-remove {
@@ -436,8 +497,8 @@
       background: none;
       border: none;
       cursor: pointer;
-      font-size: 14px;
-      padding: 2px 6px;
+      font-size: 16px;
+      padding: 0 4px;
     }
 
     .file-item-remove:hover {
@@ -478,7 +539,7 @@
       border-radius: 6px;
       padding: 12px 14px;
       font-size: 13px;
-      margin-top: 16px;
+      margin-top: 14px;
     }
 
     .msg-box.error {
@@ -495,11 +556,80 @@
       color: #86efac;
     }
 
-    .msg-box.warning {
-      display: block;
-      background: var(--warning-subtle);
-      border: 1px solid rgba(245, 158, 11, 0.3);
-      color: #fde68a;
+    /* PDF Preview Box (Side-by-side pane) */
+    .preview-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      height: 540px;
+    }
+
+    .preview-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface-2);
+    }
+
+    .preview-title {
+      font-weight: 600;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .preview-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .preview-tag {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text);
+      background: var(--surface-3);
+      padding: 2px 8px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+
+    .preview-body {
+      flex: 1;
+      position: relative;
+      background: #111318;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .preview-empty {
+      text-align: center;
+      color: var(--text-muted);
+      padding: 30px;
+      font-size: 13px;
+      max-width: 320px;
+    }
+
+    .preview-empty-icon {
+      font-size: 32px;
+      margin-bottom: 10px;
+      opacity: 0.6;
+    }
+
+    .pdf-frame {
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: none;
     }
 
     /* Inspection Spec Grid */
@@ -539,12 +669,12 @@
       word-break: break-all;
     }
 
-    /* Capabilities & Packs */
+    /* Capabilities Table */
     .cap-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
       gap: 12px;
-      margin-bottom: 24px;
+      margin-bottom: 20px;
     }
 
     @media (max-width: 500px) {
@@ -609,7 +739,7 @@
       border-collapse: collapse;
       font-size: 12px;
       margin-top: 10px;
-      margin-bottom: 24px;
+      margin-bottom: 20px;
     }
 
     .ops-table th {
@@ -647,11 +777,19 @@
       border-top: 1px solid var(--border);
     }
 
-    .tab-panel {
+    .domain-panel {
       display: none;
     }
 
-    .tab-panel.active {
+    .domain-panel.active {
+      display: block;
+    }
+
+    .sub-panel {
+      display: none;
+    }
+
+    .sub-panel.active {
       display: block;
     }
 
@@ -667,6 +805,183 @@
 
     @keyframes spin {
       to { transform: rotate(360deg); }
+    }
+
+    /* Engine Setup Card & Active Banner */
+    .engine-setup-card {
+      background: var(--surface-2);
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin-bottom: 20px;
+    }
+
+    .engine-setup-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .engine-setup-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .engine-setup-desc {
+      color: var(--text-muted);
+      font-size: 12px;
+      line-height: 1.5;
+      margin-bottom: 16px;
+    }
+
+    .engine-setup-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    @media (max-width: 768px) {
+      .engine-setup-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .setup-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .setup-box-title {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .cmd-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 2px;
+      margin-bottom: 14px;
+    }
+
+    .cmd-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 6px 10px;
+      gap: 8px;
+    }
+
+    .cmd-code {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--accent);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .cmd-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-weight: 600;
+      min-width: 52px;
+    }
+
+    .btn-copy {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 11px;
+      cursor: pointer;
+      font-family: inherit;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+    }
+
+    .btn-copy:hover {
+      color: var(--text);
+      border-color: var(--border-focus);
+    }
+
+    .btn-recheck {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 9px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+      font-family: inherit;
+      margin-top: auto;
+    }
+
+    .btn-recheck:hover {
+      border-color: var(--accent);
+      background: var(--surface-3);
+    }
+
+    .engine-active-banner {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--surface-2);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      border-radius: 8px;
+      padding: 10px 16px;
+      margin-bottom: 18px;
+    }
+
+    .engine-active-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .engine-active-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--success);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .engine-active-meta {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
     }
   </style>
 </head>
@@ -688,177 +1003,329 @@
       </div>
     </header>
 
-    <!-- Navigation Tabs -->
-    <nav class="tabs">
-      <button class="tab-btn active" data-tab="tab-convert">Convert</button>
-      <button class="tab-btn" data-tab="tab-resize">Resize</button>
-      <button class="tab-btn" data-tab="tab-pdf">PDF Tools</button>
-      <button class="tab-btn" data-tab="tab-inspect">Inspect</button>
-      <button class="tab-btn" data-tab="tab-system">Status & Packs</button>
+    <!-- Top-Level Domain Switcher: Clearly separates Images, PDFs, and System -->
+    <nav class="domain-tabs">
+      <button class="domain-btn active" data-domain="domain-images">
+        <span>Image Studio</span>
+        <span class="domain-tag">6 Formats</span>
+      </button>
+      <button class="domain-btn" data-domain="domain-pdfs">
+        <span>PDF Studio</span>
+        <span class="domain-tag">Merge &bull; Extract</span>
+      </button>
+      <button class="domain-btn" data-domain="domain-system">
+        <span>System & Packs</span>
+        <span class="domain-tag" id="domain-system-tag">Registry</span>
+      </button>
     </nav>
 
-    <!-- Shared Upload Area (Convert, Resize, Inspect) -->
-    <div id="upload-section">
-      <div class="dropzone" id="dropzone">
-        <input type="file" id="file-input" accept="image/*,.png,.jpg,.jpeg,.webp,.gif,.bmp,.tif,.tiff,.pdf">
-        <div class="dropzone-icon">⤓</div>
-        <div class="dropzone-title">Drop an image or PDF here, or click to choose</div>
-        <div class="dropzone-hint">Images: PNG, JPEG, WebP, GIF, BMP, TIFF &bull; Documents: PDF (Max 100MB)</div>
+    <!-- ============================================================ -->
+    <!-- DOMAIN 1: IMAGE STUDIO                                       -->
+    <!-- ============================================================ -->
+    <div class="domain-panel active" id="domain-images">
+      <!-- Image Dropzone & Selected Bar -->
+      <div id="img-upload-section">
+        <div class="dropzone" id="img-dropzone">
+          <input type="file" id="img-file-input" accept="image/*,.png,.jpg,.jpeg,.webp,.gif,.bmp,.tif,.tiff">
+          <div class="dropzone-icon">&boxbox;</div>
+          <div class="dropzone-title">Drop an image here or click to choose</div>
+          <div class="dropzone-hint">Supported: PNG, JPEG, WebP, GIF, BMP, TIFF (Max 100MB)</div>
+        </div>
+
+        <div class="file-bar" id="img-file-bar">
+          <div class="file-info">
+            <div class="file-thumb" id="img-preview">IMG</div>
+            <div class="file-meta">
+              <div class="file-name" id="img-file-name">filename.png</div>
+              <div class="file-specs" id="img-file-specs">0 KB</div>
+            </div>
+          </div>
+          <button class="btn-clear" id="img-btn-clear" type="button">Remove</button>
+        </div>
       </div>
 
-      <div class="file-bar" id="file-bar">
-        <div class="file-info">
-          <div class="file-thumb" id="file-preview">FILE</div>
-          <div class="file-meta">
-            <div class="file-name" id="file-name">filename.ext</div>
-            <div class="file-specs" id="file-specs">0 KB</div>
+      <!-- Image Subnav -->
+      <div class="subnav">
+        <button class="subnav-btn active" data-sub="img-sub-convert">Convert</button>
+        <button class="subnav-btn" data-sub="img-sub-resize">Resize</button>
+        <button class="subnav-btn" data-sub="img-sub-inspect">Inspect</button>
+      </div>
+
+      <!-- Image Convert Subpanel -->
+      <div class="sub-panel active" id="img-sub-convert">
+        <div class="card">
+          <div class="form-group">
+            <label class="form-label">Target Format</label>
+            <div class="format-grid" id="convert-formats">
+              <button type="button" class="format-btn active" data-fmt="webp">WEBP</button>
+              <button type="button" class="format-btn" data-fmt="png">PNG</button>
+              <button type="button" class="format-btn" data-fmt="jpg">JPEG</button>
+              <button type="button" class="format-btn" data-fmt="gif">GIF</button>
+              <button type="button" class="format-btn" data-fmt="bmp">BMP</button>
+              <button type="button" class="format-btn" data-fmt="tiff">TIFF</button>
+            </div>
           </div>
+
+          <div class="form-group" id="convert-quality-group" style="display: none;">
+            <label class="form-label">JPEG Quality</label>
+            <div class="slider-row">
+              <input type="range" class="slider" id="convert-quality" min="1" max="100" value="82">
+              <span class="slider-val" id="convert-quality-val">82</span>
+            </div>
+            <div class="form-hint">Controls JPEG compression (1&ndash;100). Higher is better fidelity.</div>
+          </div>
+
+          <button class="btn-action" id="btn-convert-run" disabled>
+            <span>Convert & Download</span>
+          </button>
+          <div class="msg-box" id="convert-msg"></div>
         </div>
-        <button class="btn-clear" id="btn-clear" type="button">Remove</button>
+      </div>
+
+      <!-- Image Resize Subpanel -->
+      <div class="sub-panel" id="img-sub-resize">
+        <div class="card">
+          <div class="form-group">
+            <label class="form-label">Bounding Box Dimensions</label>
+            <div class="input-grid">
+              <div>
+                <input type="number" class="text-input" id="resize-w" placeholder="Max Width (px)" min="1">
+                <div class="form-hint">e.g. 1920</div>
+              </div>
+              <div>
+                <input type="number" class="text-input" id="resize-h" placeholder="Max Height (px)" min="1">
+                <div class="form-hint">e.g. 1080</div>
+              </div>
+            </div>
+            <div class="form-hint">Original aspect ratio is always strictly preserved. Provide width, height, or both.</div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Output Format</label>
+            <div class="format-grid" id="resize-formats">
+              <button type="button" class="format-btn active" data-fmt="">Same as input</button>
+              <button type="button" class="format-btn" data-fmt="webp">WEBP</button>
+              <button type="button" class="format-btn" data-fmt="png">PNG</button>
+              <button type="button" class="format-btn" data-fmt="jpg">JPEG</button>
+              <button type="button" class="format-btn" data-fmt="tiff">TIFF</button>
+            </div>
+          </div>
+
+          <div class="form-group" id="resize-quality-group" style="display: none;">
+            <label class="form-label">JPEG Quality</label>
+            <div class="slider-row">
+              <input type="range" class="slider" id="resize-quality" min="1" max="100" value="82">
+              <span class="slider-val" id="resize-quality-val">82</span>
+            </div>
+          </div>
+
+          <button class="btn-action" id="btn-resize-run" disabled>
+            <span>Resize & Download</span>
+          </button>
+          <div class="msg-box" id="resize-msg"></div>
+        </div>
+      </div>
+
+      <!-- Image Inspect Subpanel -->
+      <div class="sub-panel" id="img-sub-inspect">
+        <div class="card">
+          <div id="img-inspect-empty" style="text-align: center; color: var(--text-muted); padding: 24px 0;">
+            Select an image above to inspect geometry, color model, and EXIF orientation.
+          </div>
+          <div id="img-inspect-result" style="display: none;">
+            <div style="font-weight: 600; font-size: 13px; margin-bottom: 8px;">Image Inspection Report</div>
+            <div class="spec-grid" id="img-inspect-specs"></div>
+          </div>
+          <div class="msg-box" id="img-inspect-msg"></div>
+        </div>
       </div>
     </div>
 
-    <!-- TAB 1: CONVERT (IMAGE) -->
-    <main class="tab-panel active" id="tab-convert">
-      <div class="card">
-        <div class="form-group">
-          <label class="form-label">Target Format</label>
-          <div class="format-grid" id="convert-formats">
-            <button type="button" class="format-btn active" data-fmt="webp">WEBP</button>
-            <button type="button" class="format-btn" data-fmt="png">PNG</button>
-            <button type="button" class="format-btn" data-fmt="jpg">JPEG</button>
-            <button type="button" class="format-btn" data-fmt="gif">GIF</button>
-            <button type="button" class="format-btn" data-fmt="bmp">BMP</button>
-            <button type="button" class="format-btn" data-fmt="tiff">TIFF</button>
-          </div>
+    <!-- ============================================================ -->
+    <!-- DOMAIN 2: PDF STUDIO (WITH SIDE-BY-SIDE PREVIEW)             -->
+    <!-- ============================================================ -->
+    <div class="domain-panel" id="domain-pdfs">
+      <!-- Engine Active Banner (shown when PDF engine is healthy) -->
+      <div class="engine-active-banner" id="pdf-engine-active-banner">
+        <div class="engine-active-left">
+          <span class="engine-active-title"><span class="pulse-dot"></span> PDF Engine Active (qpdf)</span>
+          <span class="engine-active-meta" id="pdf-engine-source-label">Local process</span>
         </div>
-
-        <div class="form-group" id="convert-quality-group" style="display: none;">
-          <label class="form-label">JPEG Quality</label>
-          <div class="slider-row">
-            <input type="range" class="slider" id="convert-quality" min="1" max="100" value="82">
-            <span class="slider-val" id="convert-quality-val">82</span>
-          </div>
-          <div class="form-hint">Controls JPEG compression (1–100). Higher is better visual fidelity.</div>
+        <div>
+          <button type="button" class="btn-clear" id="btn-toggle-pack-installer" style="font-size: 11px;">Pack Manager &darr;</button>
         </div>
-
-        <button class="btn-action" id="btn-convert-run" disabled>
-          <span>Convert & Download</span>
-        </button>
-
-        <div class="msg-box" id="convert-msg"></div>
       </div>
-    </main>
 
-    <!-- TAB 2: RESIZE (IMAGE) -->
-    <main class="tab-panel" id="tab-resize">
-      <div class="card">
-        <div class="form-group">
-          <label class="form-label">Bounding Box Dimensions</label>
-          <div class="input-grid">
-            <div>
-              <input type="number" class="text-input" id="resize-w" placeholder="Max Width (px)" min="1">
-              <div class="form-hint">e.g. 1920</div>
+      <!-- Engine Setup Card (shown when PDF engine is missing or on demand) -->
+      <div class="engine-setup-card" id="pdf-engine-setup-card">
+        <div class="engine-setup-header">
+          <div class="engine-setup-title">
+            <span style="color: var(--warning);">&#9888;</span>
+            <span>PDF Engine Setup Required</span>
+          </div>
+          <span class="badge-warning">Missing Engine</span>
+        </div>
+        <div class="engine-setup-desc">
+          FoldShift performs PDF merging, page extraction, and deep inspection 100% locally on your machine via <code>qpdf</code>. Files are never sent to external servers. To enable PDF features, choose either method below:
+        </div>
+
+        <div class="engine-setup-grid">
+          <!-- Method 1: Drop Pack Archive -->
+          <div class="setup-box">
+            <div class="setup-box-title">
+              <span>Option 1 &bull; Drop Capability Pack</span>
+              <span class="domain-tag">Offline .zip</span>
             </div>
-            <div>
-              <input type="number" class="text-input" id="resize-h" placeholder="Max Height (px)" min="1">
-              <div class="form-hint">e.g. 1080</div>
+            <div class="dropzone" id="pdf-pack-dropzone" style="padding: 18px 12px; margin-bottom: 8px;">
+              <input type="file" id="pdf-pack-input" accept=".zip,application/zip">
+              <div class="dropzone-icon">&boxbox;</div>
+              <div class="dropzone-title">Drop <code>foldshift-pack-qpdf-*.zip</code> here</div>
+              <div class="dropzone-hint">Local unpack & verification</div>
+            </div>
+            <div class="msg-box" id="pdf-pack-msg" style="margin-top: 4px;"></div>
+          </div>
+
+          <!-- Method 2: System Package Manager -->
+          <div class="setup-box">
+            <div class="setup-box-title">
+              <span>Option 2 &bull; System Package</span>
+              <span class="domain-tag">Package Manager</span>
+            </div>
+            <div class="cmd-list">
+              <div class="cmd-row">
+                <span class="cmd-label">Windows</span>
+                <span class="cmd-code">winget install qpdf.qpdf</span>
+                <button type="button" class="btn-copy" data-cmd="winget install qpdf.qpdf">Copy</button>
+              </div>
+              <div class="cmd-row">
+                <span class="cmd-label">macOS</span>
+                <span class="cmd-code">brew install qpdf</span>
+                <button type="button" class="btn-copy" data-cmd="brew install qpdf">Copy</button>
+              </div>
+              <div class="cmd-row">
+                <span class="cmd-label">Linux</span>
+                <span class="cmd-code">sudo apt install qpdf</span>
+                <button type="button" class="btn-copy" data-cmd="sudo apt install qpdf">Copy</button>
+              </div>
+            </div>
+            <button type="button" class="btn-recheck" id="btn-recheck-engine">
+              <span>&#8635;</span> <span>Re-check Engine</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- PDF Subnav -->
+      <div class="subnav">
+        <button class="subnav-btn active" data-sub="pdf-sub-merge">Merge Documents</button>
+        <button class="subnav-btn" data-sub="pdf-sub-extract">Extract Pages</button>
+        <button class="subnav-btn" data-sub="pdf-sub-inspect">Inspect Document</button>
+      </div>
+
+      <!-- Split Layout: Tools on Left, Live PDF Preview on Right -->
+      <div class="split-layout">
+        <!-- LEFT COLUMN: PDF TOOL CONTROLS -->
+        <div class="pdf-controls-col">
+          <!-- SUBPANEL 1: PDF MERGE -->
+          <div class="sub-panel active" id="pdf-sub-merge">
+            <div class="card">
+              <div class="form-group">
+                <label class="form-label">Add PDF Documents</label>
+                <div class="dropzone" id="pdf-merge-dropzone" style="padding: 20px;">
+                  <input type="file" id="pdf-merge-input" accept=".pdf,application/pdf" multiple>
+                  <div class="dropzone-icon">&plus;</div>
+                  <div class="dropzone-title">Add PDFs to combine (ordered)</div>
+                  <div class="dropzone-hint">Select multiple documents &bull; Click any file to preview</div>
+                </div>
+              </div>
+
+              <div class="form-label" style="margin-top: 12px; margin-bottom: 6px;">Document Queue (Merge Order)</div>
+              <div class="file-list" id="pdf-merge-list">
+                <div style="color: var(--text-muted); font-size: 12px; padding: 8px 0;">No PDFs added yet. Add at least two files to merge.</div>
+              </div>
+
+              <button class="btn-action" id="btn-pdf-merge-run" disabled>
+                <span>Merge & Download</span>
+              </button>
+              <div class="msg-box" id="pdf-merge-msg"></div>
             </div>
           </div>
-          <div class="form-hint">Original aspect ratio is always strictly preserved. Provide width, height, or both.</div>
-        </div>
 
-        <div class="form-group">
-          <label class="form-label">Output Format</label>
-          <div class="format-grid" id="resize-formats">
-            <button type="button" class="format-btn active" data-fmt="">Same as input</button>
-            <button type="button" class="format-btn" data-fmt="webp">WEBP</button>
-            <button type="button" class="format-btn" data-fmt="png">PNG</button>
-            <button type="button" class="format-btn" data-fmt="jpg">JPEG</button>
-            <button type="button" class="format-btn" data-fmt="tiff">TIFF</button>
-          </div>
-        </div>
+          <!-- SUBPANEL 2: PDF EXTRACT -->
+          <div class="sub-panel" id="pdf-sub-extract">
+            <div class="card">
+              <div class="form-group">
+                <label class="form-label">Source PDF Document</label>
+                <div class="dropzone" id="pdf-extract-dropzone" style="padding: 20px;">
+                  <input type="file" id="pdf-extract-input" accept=".pdf,application/pdf">
+                  <div class="dropzone-icon">&darr;</div>
+                  <div class="dropzone-title" id="pdf-extract-title">Choose or drop a PDF</div>
+                  <div class="dropzone-hint" id="pdf-extract-hint">Document will be displayed in the preview pane</div>
+                </div>
+              </div>
 
-        <div class="form-group" id="resize-quality-group" style="display: none;">
-          <label class="form-label">JPEG Quality</label>
-          <div class="slider-row">
-            <input type="range" class="slider" id="resize-quality" min="1" max="100" value="82">
-            <span class="slider-val" id="resize-quality-val">82</span>
-          </div>
-        </div>
+              <div class="form-group">
+                <label class="form-label">Pages to Extract</label>
+                <input type="text" class="text-input" id="pdf-extract-pages" placeholder="e.g. 1-3, 5, 8-10">
+                <div class="form-hint">Specify page numbers or ranges separated by commas.</div>
+              </div>
 
-        <button class="btn-action" id="btn-resize-run" disabled>
-          <span>Resize & Download</span>
-        </button>
-
-        <div class="msg-box" id="resize-msg"></div>
-      </div>
-    </main>
-
-    <!-- TAB 3: PDF TOOLS (MERGE & EXTRACT) -->
-    <main class="tab-panel" id="tab-pdf">
-      <div class="card">
-        <div class="subtabs">
-          <button type="button" class="subtab-btn active" id="subtab-pdf-merge-btn">Merge PDFs</button>
-          <button type="button" class="subtab-btn" id="subtab-pdf-extract-btn">Extract Pages</button>
-        </div>
-
-        <!-- PDF Merge Section -->
-        <div id="pdf-merge-section">
-          <div class="form-group">
-            <label class="form-label">Upload PDFs to Merge</label>
-            <div class="dropzone" id="pdf-merge-dropzone" style="padding: 20px;">
-              <input type="file" id="pdf-merge-input" accept=".pdf,application/pdf" multiple>
-              <div class="dropzone-icon" style="font-size: 20px;">+</div>
-              <div class="dropzone-title" style="font-size: 13px;">Add PDF files (ordered)</div>
-              <div class="dropzone-hint">Select multiple documents to combine into a single PDF</div>
+              <button class="btn-action" id="btn-pdf-extract-run" disabled>
+                <span>Extract & Download</span>
+              </button>
+              <div class="msg-box" id="pdf-extract-msg"></div>
             </div>
           </div>
 
-          <div class="file-list" id="pdf-merge-list"></div>
+          <!-- SUBPANEL 3: PDF INSPECT -->
+          <div class="sub-panel" id="pdf-sub-inspect">
+            <div class="card">
+              <div class="form-group">
+                <label class="form-label">Select Document to Inspect</label>
+                <div class="dropzone" id="pdf-inspect-dropzone" style="padding: 20px;">
+                  <input type="file" id="pdf-inspect-input" accept=".pdf,application/pdf">
+                  <div class="dropzone-icon">&search;</div>
+                  <div class="dropzone-title" id="pdf-inspect-title">Choose or drop a PDF</div>
+                  <div class="dropzone-hint">Examines header, page count, and structural metadata</div>
+                </div>
+              </div>
 
-          <button class="btn-action" id="btn-pdf-merge-run" disabled>
-            <span>Merge & Download</span>
-          </button>
-          <div class="msg-box" id="pdf-merge-msg"></div>
-        </div>
-
-        <!-- PDF Extract Section -->
-        <div id="pdf-extract-section" style="display: none;">
-          <div class="form-group">
-            <label class="form-label">Page Selection</label>
-            <input type="text" class="text-input" id="pdf-extract-pages" placeholder="e.g. 1-3, 5, 8-10">
-            <div class="form-hint">Specify individual pages or ranges separated by commas (e.g. <code>1-3, 5</code>).</div>
-          </div>
-
-          <button class="btn-action" id="btn-pdf-extract-run" disabled>
-            <span>Extract & Download</span>
-          </button>
-          <div class="msg-box" id="pdf-extract-msg"></div>
-        </div>
-      </div>
-    </main>
-
-    <!-- TAB 4: INSPECT -->
-    <main class="tab-panel" id="tab-inspect">
-      <div class="card">
-        <div id="inspect-empty" style="text-align: center; color: var(--text-muted); padding: 20px 0;">
-          Select or drop a file above to inspect geometry, page count, and metadata properties.
-        </div>
-
-        <div id="inspect-result" style="display: none;">
-          <div style="font-weight: 600; font-size: 14px; margin-bottom: 10px;">File Inspection Report</div>
-          <div class="spec-grid" id="inspect-specs">
-            <!-- Populated via JS -->
+              <div id="pdf-inspect-result" style="display: none; margin-top: 14px;">
+                <div style="font-weight: 600; font-size: 13px; margin-bottom: 8px;">PDF Inspection Report</div>
+                <div class="spec-grid" id="pdf-inspect-specs"></div>
+              </div>
+              <div class="msg-box" id="pdf-inspect-msg"></div>
+            </div>
           </div>
         </div>
 
-        <div class="msg-box" id="inspect-msg"></div>
+        <!-- RIGHT COLUMN: SIDE-BY-SIDE PDF PREVIEW PANE -->
+        <div class="preview-box" id="pdf-preview-box">
+          <div class="preview-header">
+            <div class="preview-title">
+              <span>Preview</span>
+              <span class="preview-tag" id="preview-filename">No document selected</span>
+            </div>
+            <div class="preview-actions">
+              <span class="preview-tag" id="preview-page-tag" style="display: none;">0 Pages</span>
+            </div>
+          </div>
+          <div class="preview-body" id="preview-body">
+            <div class="preview-empty" id="preview-empty-state">
+              <div class="preview-empty-icon">&doc;</div>
+              <div style="font-weight: 600; margin-bottom: 4px;">Side-by-Side Preview</div>
+              <div>Select or drop a PDF document on the left to inspect its pages and verify output in real time.</div>
+            </div>
+            <iframe class="pdf-frame" id="pdf-preview-frame" title="PDF Document Preview"></iframe>
+          </div>
+        </div>
       </div>
-    </main>
+    </div>
 
-    <!-- TAB 5: STATUS & PACKS -->
-    <main class="tab-panel" id="tab-system">
+    <!-- ============================================================ -->
+    <!-- DOMAIN 3: SYSTEM & PACKS                                     -->
+    <!-- ============================================================ -->
+    <div class="domain-panel" id="domain-system">
       <div class="card">
         <div class="form-label" style="margin-bottom: 12px;">Engines & Capabilities</div>
         <div class="cap-grid">
@@ -867,7 +1334,7 @@
               <span class="cap-name">CORE Engine</span>
               <span class="badge-installed">Installed</span>
             </div>
-            <div class="cap-desc">Job execution, safe tempfile swapping, atomic pipeline</div>
+            <div class="cap-desc">Job execution, atomic replacement, safe tempfile swapping</div>
           </div>
           <div class="cap-box" id="cap-box-image">
             <div class="cap-header">
@@ -881,7 +1348,7 @@
               <span class="cap-name">PDF Engine (qpdf)</span>
               <span class="badge-planned" id="badge-pdf">Checking...</span>
             </div>
-            <div class="cap-desc" id="desc-pdf">Inspecting, merging, and page extraction</div>
+            <div class="cap-desc" id="desc-pdf">Subprocess adapter for merge, extract, and inspection</div>
           </div>
           <div class="cap-box" id="cap-box-media">
             <div class="cap-header">
@@ -892,7 +1359,7 @@
           </div>
         </div>
 
-        <div class="form-label" style="margin-top: 10px; margin-bottom: 8px;">Installed Capability Packs</div>
+        <div class="form-label" style="margin-top: 14px; margin-bottom: 8px;">Installed Capability Packs</div>
         <table class="ops-table">
           <thead>
             <tr>
@@ -907,7 +1374,16 @@
           </tbody>
         </table>
 
-        <div class="form-label" style="margin-top: 10px; margin-bottom: 8px;">Registered Operations Matrix</div>
+        <div class="form-label" style="margin-top: 14px; margin-bottom: 8px;">Install / Update Capability Pack (.zip)</div>
+        <div class="dropzone" id="system-pack-dropzone" style="padding: 16px; margin-bottom: 8px;">
+          <input type="file" id="system-pack-input" accept=".zip,application/zip">
+          <div class="dropzone-icon">&boxbox;</div>
+          <div class="dropzone-title">Drop capability pack archive (.zip) here</div>
+          <div class="dropzone-hint">Validates signature, manifest, and SHA-256 before atomic install</div>
+        </div>
+        <div class="msg-box" id="system-pack-msg" style="margin-bottom: 14px;"></div>
+
+        <div class="form-label" style="margin-top: 14px; margin-bottom: 8px;">Registered Operations Matrix</div>
         <table class="ops-table">
           <thead>
             <tr>
@@ -921,230 +1397,57 @@
           </tbody>
         </table>
       </div>
-    </main>
+    </div>
 
     <footer>
-      <span>FoldShift • Convert files. Keep them yours. • MIT License</span>
+      <span>FoldShift &bull; Convert files. Keep them yours. &bull; MIT License</span>
     </footer>
   </div>
 
   <script>
-    // State
-    let currentFile = null;
-    let selectedConvertFormat = 'webp';
-    let selectedResizeFormat = '';
-    let pdfMergeFiles = [];
+    // ============================================================
+    // DOMAIN SWITCHER (Images, PDFs, System)
+    // ============================================================
+    const domainBtns = document.querySelectorAll('.domain-btn');
+    const domainPanels = document.querySelectorAll('.domain-panel');
 
-    // Elements
-    const dropzone = document.getElementById('dropzone');
-    const fileInput = document.getElementById('file-input');
-    const fileBar = document.getElementById('file-bar');
-    const fileNameEl = document.getElementById('file-name');
-    const fileSpecsEl = document.getElementById('file-specs');
-    const filePreview = document.getElementById('file-preview');
-    const btnClear = document.getElementById('btn-clear');
-
-    const tabBtns = document.querySelectorAll('.tab-btn');
-    const tabPanels = document.querySelectorAll('.tab-panel');
-
-    // Tab Navigation
-    tabBtns.forEach(btn => {
+    domainBtns.forEach(btn => {
       btn.addEventListener('click', () => {
-        tabBtns.forEach(b => b.classList.remove('active'));
-        tabPanels.forEach(p => p.classList.remove('active'));
+        domainBtns.forEach(b => b.classList.remove('active'));
+        domainPanels.forEach(p => p.classList.remove('active'));
         btn.classList.add('active');
-        const target = document.getElementById(btn.dataset.tab);
+        const target = document.getElementById(btn.dataset.domain);
         if (target) target.classList.add('active');
-
-        if (btn.dataset.tab === 'tab-inspect' && currentFile) {
-          inspectFile(currentFile);
-        }
       });
     });
 
-    // Subtabs (PDF Merge / Extract)
-    const subtabMergeBtn = document.getElementById('subtab-pdf-merge-btn');
-    const subtabExtractBtn = document.getElementById('subtab-pdf-extract-btn');
-    const pdfMergeSection = document.getElementById('pdf-merge-section');
-    const pdfExtractSection = document.getElementById('pdf-extract-section');
-
-    subtabMergeBtn.addEventListener('click', () => {
-      subtabMergeBtn.classList.add('active');
-      subtabExtractBtn.classList.remove('active');
-      pdfMergeSection.style.display = 'block';
-      pdfExtractSection.style.display = 'none';
-    });
-
-    subtabExtractBtn.addEventListener('click', () => {
-      subtabExtractBtn.classList.add('active');
-      subtabMergeBtn.classList.remove('active');
-      pdfMergeSection.style.display = 'none';
-      pdfExtractSection.style.display = 'block';
-      updatePdfExtractButton();
-    });
-
-    // File Handling
-    function handleSelectedFile(file) {
-      if (!file) return;
-      currentFile = file;
-
-      fileNameEl.textContent = file.name;
-      fileSpecsEl.textContent = formatBytes(file.size);
-
-      const isPdf = file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf';
-
-      if (isPdf) {
-        filePreview.textContent = 'PDF';
-        filePreview.style.backgroundImage = 'none';
-      } else if (file.type.startsWith('image/')) {
-        const reader = new FileReader();
-        reader.onload = e => {
-          filePreview.textContent = '';
-          filePreview.style.backgroundImage = `url("${e.target.result}")`;
-          filePreview.style.backgroundSize = 'cover';
-        };
-        reader.readAsDataURL(file);
-      } else {
-        filePreview.textContent = 'FILE';
-        filePreview.style.backgroundImage = 'none';
-      }
-
-      dropzone.style.display = 'none';
-      fileBar.style.display = 'flex';
-
-      // Update button states
-      document.getElementById('btn-convert-run').disabled = isPdf;
-      document.getElementById('btn-resize-run').disabled = isPdf;
-      updatePdfExtractButton();
-
-      // Trigger instant inspect
-      inspectFile(file);
-    }
-
-    function updatePdfExtractButton() {
-      const isPdf = currentFile && (currentFile.name.toLowerCase().endsWith('.pdf') || currentFile.type === 'application/pdf');
-      const pages = document.getElementById('pdf-extract-pages').value.trim();
-      document.getElementById('btn-pdf-extract-run').disabled = !(isPdf && pages.length > 0);
-    }
-
-    document.getElementById('pdf-extract-pages').addEventListener('input', updatePdfExtractButton);
-
-    function clearFile() {
-      currentFile = null;
-      fileInput.value = '';
-      dropzone.style.display = 'block';
-      fileBar.style.display = 'none';
-      filePreview.textContent = 'FILE';
-      filePreview.style.backgroundImage = 'none';
-
-      document.getElementById('btn-convert-run').disabled = true;
-      document.getElementById('btn-resize-run').disabled = true;
-      document.getElementById('btn-pdf-extract-run').disabled = true;
-      document.getElementById('inspect-result').style.display = 'none';
-      document.getElementById('inspect-empty').style.display = 'block';
-
-      hideMsg('convert-msg');
-      hideMsg('resize-msg');
-      hideMsg('inspect-msg');
-      hideMsg('pdf-extract-msg');
-    }
-
-    fileInput.addEventListener('change', (e) => {
-      if (e.target.files.length) handleSelectedFile(e.target.files[0]);
-    });
-
-    btnClear.addEventListener('click', clearFile);
-
-    // Drag and Drop for main dropzone
-    ['dragenter', 'dragover'].forEach(name => {
-      dropzone.addEventListener(name, (e) => {
-        e.preventDefault();
-        dropzone.classList.add('dragover');
-      });
-    });
-
-    ['dragleave', 'drop'].forEach(name => {
-      dropzone.addEventListener(name, (e) => {
-        e.preventDefault();
-        dropzone.classList.remove('dragover');
-      });
-    });
-
-    dropzone.addEventListener('drop', (e) => {
-      if (e.dataTransfer.files.length) {
-        handleSelectedFile(e.dataTransfer.files[0]);
-      }
-    });
-
-    // PDF Merge Multiple Files Handling
-    const pdfMergeInput = document.getElementById('pdf-merge-input');
-    const pdfMergeDropzone = document.getElementById('pdf-merge-dropzone');
-    const pdfMergeList = document.getElementById('pdf-merge-list');
-    const btnPdfMergeRun = document.getElementById('btn-pdf-merge-run');
-
-    function renderPdfMergeList() {
-      pdfMergeList.innerHTML = '';
-      pdfMergeFiles.forEach((f, idx) => {
-        const item = document.createElement('div');
-        item.className = 'file-item';
-        item.innerHTML = `
-          <span class="file-item-name">${idx + 1}. ${f.name} (${formatBytes(f.size)})</span>
-          <button type="button" class="file-item-remove" data-idx="${idx}">&times;</button>
-        `;
-        pdfMergeList.appendChild(item);
-      });
-
-      pdfMergeList.querySelectorAll('.file-item-remove').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          const idx = parseInt(e.target.dataset.idx, 10);
-          pdfMergeFiles.splice(idx, 1);
-          renderPdfMergeList();
+    // Sub-navigation handlers (within current domain)
+    function setupSubnav(parentSelector) {
+      const container = document.querySelector(parentSelector);
+      if (!container) return;
+      const subBtns = container.querySelectorAll('.subnav-btn');
+      subBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          subBtns.forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          const targetSub = btn.dataset.sub;
+          container.querySelectorAll('.sub-panel').forEach(p => {
+            if (p.id === targetSub) {
+              p.classList.add('active');
+            } else {
+              p.classList.remove('active');
+            }
+          });
         });
       });
-
-      btnPdfMergeRun.disabled = pdfMergeFiles.length < 2;
     }
 
-    pdfMergeInput.addEventListener('change', (e) => {
-      for (const f of e.target.files) {
-        pdfMergeFiles.push(f);
-      }
-      renderPdfMergeList();
-      pdfMergeInput.value = '';
-    });
+    setupSubnav('#domain-images');
+    setupSubnav('#domain-pdfs');
 
-    // Format buttons for Convert
-    document.querySelectorAll('#convert-formats .format-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('#convert-formats .format-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        selectedConvertFormat = btn.dataset.fmt;
-        const qGroup = document.getElementById('convert-quality-group');
-        qGroup.style.display = (selectedConvertFormat === 'jpg') ? 'block' : 'none';
-      });
-    });
-
-    // Format buttons for Resize
-    document.querySelectorAll('#resize-formats .format-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('#resize-formats .format-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        selectedResizeFormat = btn.dataset.fmt;
-        const qGroup = document.getElementById('resize-quality-group');
-        qGroup.style.display = (selectedResizeFormat === 'jpg') ? 'block' : 'none';
-      });
-    });
-
-    // Sliders
-    const cq = document.getElementById('convert-quality');
-    const cqv = document.getElementById('convert-quality-val');
-    cq.addEventListener('input', () => { cqv.textContent = cq.value; });
-
-    const rq = document.getElementById('resize-quality');
-    const rqv = document.getElementById('resize-quality-val');
-    rq.addEventListener('input', () => { rqv.textContent = rq.value; });
-
-    // Helpers
+    // ============================================================
+    // HELPERS
+    // ============================================================
     function formatBytes(bytes) {
       if (!bytes || bytes === 0) return '0 Bytes';
       const k = 1024;
@@ -1155,6 +1458,7 @@
 
     function showMsg(id, type, text) {
       const el = document.getElementById(id);
+      if (!el) return;
       el.className = 'msg-box ' + type;
       el.textContent = text;
       el.style.display = 'block';
@@ -1165,54 +1469,146 @@
       if (el) el.style.display = 'none';
     }
 
-    // Inspect Action
-    async function inspectFile(file) {
-      hideMsg('inspect-msg');
+    // ============================================================
+    // IMAGE STUDIO LOGIC
+    // ============================================================
+    let currentImageFile = null;
+    let selectedConvertFormat = 'webp';
+    let selectedResizeFormat = '';
+
+    const imgDropzone = document.getElementById('img-dropzone');
+    const imgFileInput = document.getElementById('img-file-input');
+    const imgFileBar = document.getElementById('img-file-bar');
+    const imgFileName = document.getElementById('img-file-name');
+    const imgFileSpecs = document.getElementById('img-file-specs');
+    const imgPreview = document.getElementById('img-preview');
+    const imgBtnClear = document.getElementById('img-btn-clear');
+
+    function handleSelectedImage(file) {
+      if (!file) return;
+      currentImageFile = file;
+
+      imgFileName.textContent = file.name;
+      imgFileSpecs.textContent = formatBytes(file.size);
+
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = e => {
+          imgPreview.textContent = '';
+          imgPreview.style.backgroundImage = `url("${e.target.result}")`;
+          imgPreview.style.backgroundSize = 'cover';
+        };
+        reader.readAsDataURL(file);
+      } else {
+        imgPreview.textContent = 'IMG';
+        imgPreview.style.backgroundImage = 'none';
+      }
+
+      imgDropzone.style.display = 'none';
+      imgFileBar.style.display = 'flex';
+
+      document.getElementById('btn-convert-run').disabled = false;
+      document.getElementById('btn-resize-run').disabled = false;
+
+      inspectImage(file);
+    }
+
+    function clearImage() {
+      currentImageFile = null;
+      imgFileInput.value = '';
+      imgDropzone.style.display = 'block';
+      imgFileBar.style.display = 'none';
+      imgPreview.textContent = 'IMG';
+      imgPreview.style.backgroundImage = 'none';
+
+      document.getElementById('btn-convert-run').disabled = true;
+      document.getElementById('btn-resize-run').disabled = true;
+      document.getElementById('img-inspect-result').style.display = 'none';
+      document.getElementById('img-inspect-empty').style.display = 'block';
+
+      hideMsg('convert-msg');
+      hideMsg('resize-msg');
+      hideMsg('img-inspect-msg');
+    }
+
+    imgFileInput.addEventListener('change', e => {
+      if (e.target.files.length) handleSelectedImage(e.target.files[0]);
+    });
+    imgBtnClear.addEventListener('click', clearImage);
+
+    ['dragenter', 'dragover'].forEach(name => {
+      imgDropzone.addEventListener(name, e => {
+        e.preventDefault();
+        imgDropzone.classList.add('dragover');
+      });
+    });
+    ['dragleave', 'drop'].forEach(name => {
+      imgDropzone.addEventListener(name, e => {
+        e.preventDefault();
+        imgDropzone.classList.remove('dragover');
+      });
+    });
+    imgDropzone.addEventListener('drop', e => {
+      if (e.dataTransfer.files.length) handleSelectedImage(e.dataTransfer.files[0]);
+    });
+
+    // Image Formats & Sliders
+    document.querySelectorAll('#convert-formats .format-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#convert-formats .format-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        selectedConvertFormat = btn.dataset.fmt;
+        const qGroup = document.getElementById('convert-quality-group');
+        qGroup.style.display = (selectedConvertFormat === 'jpg') ? 'block' : 'none';
+      });
+    });
+
+    document.querySelectorAll('#resize-formats .format-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#resize-formats .format-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        selectedResizeFormat = btn.dataset.fmt;
+        const qGroup = document.getElementById('resize-quality-group');
+        qGroup.style.display = (selectedResizeFormat === 'jpg') ? 'block' : 'none';
+      });
+    });
+
+    const cq = document.getElementById('convert-quality');
+    const cqv = document.getElementById('convert-quality-val');
+    cq.addEventListener('input', () => { cqv.textContent = cq.value; });
+
+    const rq = document.getElementById('resize-quality');
+    const rqv = document.getElementById('resize-quality-val');
+    rq.addEventListener('input', () => { rqv.textContent = rq.value; });
+
+    // Inspect Image Action
+    async function inspectImage(file) {
+      hideMsg('img-inspect-msg');
       const formData = new FormData();
       formData.append('file', file);
 
       try {
         const res = await fetch('/api/inspect', { method: 'POST', body: formData });
         const data = await res.json();
-
         if (!res.ok) {
-          showMsg('inspect-msg', 'error', data.error || 'Inspection failed');
+          showMsg('img-inspect-msg', 'error', data.error || 'Inspection failed');
           return;
         }
 
-        document.getElementById('inspect-empty').style.display = 'none';
-        const inspectResult = document.getElementById('inspect-result');
-        const specGrid = document.getElementById('inspect-specs');
+        document.getElementById('img-inspect-empty').style.display = 'none';
+        const inspectResult = document.getElementById('img-inspect-result');
+        const specGrid = document.getElementById('img-inspect-specs');
         specGrid.innerHTML = '';
 
         const items = [
           { key: 'Format', val: data.format },
-          { key: 'Media Kind', val: data.media_kind },
           { key: 'File Size', val: `${formatBytes(data.bytes)} (${data.bytes.toLocaleString()} bytes)` },
         ];
-
-        if (data.properties.page_count !== undefined) {
-          items.push({ key: 'Page Count', val: `${data.properties.page_count} pages` });
-        }
-        if (data.properties.pdf_version) {
-          items.push({ key: 'PDF Version', val: data.properties.pdf_version });
-        }
         if (data.properties.width !== undefined && data.properties.height !== undefined) {
-          items.push({ key: 'Dimensions', val: `${data.properties.width} × ${data.properties.height} px` });
+          items.push({ key: 'Dimensions', val: `${data.properties.width} &times; ${data.properties.height} px` });
         }
-        if (data.properties.color) {
-          items.push({ key: 'Color Type', val: data.properties.color });
-        }
-        if (data.properties.orientation) {
-          items.push({ key: 'Orientation', val: data.properties.orientation });
-        }
-
-        // Add any other properties
-        for (const [k, v] of Object.entries(data.properties)) {
-          if (!['page_count', 'pdf_version', 'width', 'height', 'color', 'orientation'].includes(k)) {
-            items.push({ key: k, val: JSON.stringify(v) });
-          }
-        }
+        if (data.properties.color) items.push({ key: 'Color Type', val: data.properties.color });
+        if (data.properties.orientation) items.push({ key: 'Orientation', val: data.properties.orientation });
 
         items.forEach(item => {
           const div = document.createElement('div');
@@ -1223,20 +1619,20 @@
 
         inspectResult.style.display = 'block';
       } catch (err) {
-        showMsg('inspect-msg', 'error', 'Network error or backend unreachable: ' + err.message);
+        showMsg('img-inspect-msg', 'error', 'Inspection error: ' + err.message);
       }
     }
 
-    // Convert Action
+    // Convert Image Action
     const btnConvert = document.getElementById('btn-convert-run');
     btnConvert.addEventListener('click', async () => {
-      if (!currentFile) return;
+      if (!currentImageFile) return;
       hideMsg('convert-msg');
       btnConvert.disabled = true;
       btnConvert.innerHTML = '<span class="spinner"></span> <span>Processing locally...</span>';
 
       const formData = new FormData();
-      formData.append('file', currentFile);
+      formData.append('file', currentImageFile);
       formData.append('format', selectedConvertFormat);
       formData.append('quality', cq.value);
 
@@ -1273,10 +1669,10 @@
       }
     });
 
-    // Resize Action
+    // Resize Image Action
     const btnResize = document.getElementById('btn-resize-run');
     btnResize.addEventListener('click', async () => {
-      if (!currentFile) return;
+      if (!currentImageFile) return;
       const w = document.getElementById('resize-w').value;
       const h = document.getElementById('resize-h').value;
 
@@ -1290,7 +1686,7 @@
       btnResize.innerHTML = '<span class="spinner"></span> <span>Resizing locally...</span>';
 
       const formData = new FormData();
-      formData.append('file', currentFile);
+      formData.append('file', currentImageFile);
       if (w) formData.append('width', w);
       if (h) formData.append('height', h);
       if (selectedResizeFormat) formData.append('format', selectedResizeFormat);
@@ -1329,12 +1725,136 @@
       }
     });
 
-    // PDF Merge Action
+    // ============================================================
+    // PDF STUDIO LOGIC (WITH SIDE-BY-SIDE PREVIEW)
+    // ============================================================
+    let activePreviewBlobUrl = null;
+    let pdfMergeFiles = [];
+    let currentExtractPdf = null;
+    let currentInspectPdf = null;
+
+    const previewFrame = document.getElementById('pdf-preview-frame');
+    const previewEmptyState = document.getElementById('preview-empty-state');
+    const previewFilename = document.getElementById('preview-filename');
+    const previewPageTag = document.getElementById('preview-page-tag');
+
+    function renderPdfInPreview(blobOrFile, displayName, pageCount) {
+      if (activePreviewBlobUrl) {
+        URL.revokeObjectURL(activePreviewBlobUrl);
+      }
+      activePreviewBlobUrl = URL.createObjectURL(blobOrFile);
+
+      previewFrame.src = activePreviewBlobUrl;
+      previewFrame.style.display = 'block';
+      previewEmptyState.style.display = 'none';
+
+      previewFilename.textContent = displayName || 'Document';
+      if (pageCount) {
+        previewPageTag.textContent = `${pageCount} Pages`;
+        previewPageTag.style.display = 'inline-block';
+      } else {
+        previewPageTag.style.display = 'none';
+      }
+    }
+
+    function clearPdfPreview() {
+      if (activePreviewBlobUrl) {
+        URL.revokeObjectURL(activePreviewBlobUrl);
+        activePreviewBlobUrl = null;
+      }
+      previewFrame.src = '';
+      previewFrame.style.display = 'none';
+      previewEmptyState.style.display = 'block';
+      previewFilename.textContent = 'No document selected';
+      previewPageTag.style.display = 'none';
+    }
+
+    // --- PDF Merge Queue ---
+    const pdfMergeInput = document.getElementById('pdf-merge-input');
+    const pdfMergeDropzone = document.getElementById('pdf-merge-dropzone');
+    const pdfMergeList = document.getElementById('pdf-merge-list');
+    const btnPdfMergeRun = document.getElementById('btn-pdf-merge-run');
+
+    function renderPdfMergeList() {
+      pdfMergeList.innerHTML = '';
+      if (pdfMergeFiles.length === 0) {
+        pdfMergeList.innerHTML = '<div style="color: var(--text-muted); font-size: 12px; padding: 8px 0;">No PDFs added yet. Add at least two files to merge.</div>';
+        btnPdfMergeRun.disabled = true;
+        return;
+      }
+
+      pdfMergeFiles.forEach((file, idx) => {
+        const item = document.createElement('div');
+        item.className = 'file-item';
+        item.innerHTML = `
+          <div class="file-item-info">
+            <span class="file-item-num">#${idx + 1}</span>
+            <span class="file-item-name">${file.name}</span>
+            <span style="color: var(--text-muted); font-size: 11px;">(${formatBytes(file.size)})</span>
+          </div>
+          <button type="button" class="file-item-remove" data-idx="${idx}" title="Remove file">&times;</button>
+        `;
+        item.addEventListener('click', (e) => {
+          if (e.target.classList.contains('file-item-remove')) return;
+          document.querySelectorAll('#pdf-merge-list .file-item').forEach(el => el.classList.remove('selected'));
+          item.classList.add('selected');
+          renderPdfInPreview(file, file.name);
+        });
+        pdfMergeList.appendChild(item);
+      });
+
+      pdfMergeList.querySelectorAll('.file-item-remove').forEach(btn => {
+        btn.addEventListener('click', e => {
+          e.stopPropagation();
+          const idx = parseInt(e.target.dataset.idx, 10);
+          pdfMergeFiles.splice(idx, 1);
+          renderPdfMergeList();
+        });
+      });
+
+      btnPdfMergeRun.disabled = pdfMergeFiles.length < 2;
+    }
+
+    pdfMergeInput.addEventListener('change', e => {
+      for (const f of e.target.files) {
+        pdfMergeFiles.push(f);
+      }
+      renderPdfMergeList();
+      if (pdfMergeFiles.length > 0) {
+        renderPdfInPreview(pdfMergeFiles[pdfMergeFiles.length - 1], pdfMergeFiles[pdfMergeFiles.length - 1].name);
+      }
+      pdfMergeInput.value = '';
+    });
+
+    ['dragenter', 'dragover'].forEach(name => {
+      pdfMergeDropzone.addEventListener(name, e => {
+        e.preventDefault();
+        pdfMergeDropzone.classList.add('dragover');
+      });
+    });
+    ['dragleave', 'drop'].forEach(name => {
+      pdfMergeDropzone.addEventListener(name, e => {
+        e.preventDefault();
+        pdfMergeDropzone.classList.remove('dragover');
+      });
+    });
+    pdfMergeDropzone.addEventListener('drop', e => {
+      if (e.dataTransfer.files.length) {
+        for (const f of e.dataTransfer.files) {
+          if (f.name.toLowerCase().endsWith('.pdf')) pdfMergeFiles.push(f);
+        }
+        renderPdfMergeList();
+        if (pdfMergeFiles.length > 0) {
+          renderPdfInPreview(pdfMergeFiles[pdfMergeFiles.length - 1], pdfMergeFiles[pdfMergeFiles.length - 1].name);
+        }
+      }
+    });
+
     btnPdfMergeRun.addEventListener('click', async () => {
       if (pdfMergeFiles.length < 2) return;
       hideMsg('pdf-merge-msg');
       btnPdfMergeRun.disabled = true;
-      btnPdfMergeRun.innerHTML = '<span class="spinner"></span> <span>Merging PDFs locally...</span>';
+      btnPdfMergeRun.innerHTML = '<span class="spinner"></span> <span>Merging with qpdf...</span>';
 
       const formData = new FormData();
       pdfMergeFiles.forEach(f => {
@@ -1348,6 +1868,8 @@
           showMsg('pdf-merge-msg', 'error', errData.error || 'PDF merge failed');
         } else {
           const blob = await res.blob();
+          renderPdfInPreview(blob, 'merged.pdf');
+
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
@@ -1357,7 +1879,7 @@
           a.remove();
           URL.revokeObjectURL(url);
 
-          showMsg('pdf-merge-msg', 'success', `Saved merged.pdf (${formatBytes(blob.size)})`);
+          showMsg('pdf-merge-msg', 'success', `Successfully merged ${pdfMergeFiles.length} files &rarr; merged.pdf (${formatBytes(blob.size)})`);
         }
       } catch (err) {
         showMsg('pdf-merge-msg', 'error', 'Error: ' + err.message);
@@ -1367,29 +1889,47 @@
       }
     });
 
-    // PDF Extract Action
+    // --- PDF Extract Tool ---
+    const pdfExtractInput = document.getElementById('pdf-extract-input');
+    const pdfExtractPages = document.getElementById('pdf-extract-pages');
     const btnPdfExtractRun = document.getElementById('btn-pdf-extract-run');
-    btnPdfExtractRun.addEventListener('click', async () => {
-      if (!currentFile) return;
-      const pages = document.getElementById('pdf-extract-pages').value.trim();
-      if (!pages) {
-        showMsg('pdf-extract-msg', 'error', 'Please specify pages to extract (e.g. 1-3, 5)');
-        return;
-      }
+    const pdfExtractTitle = document.getElementById('pdf-extract-title');
+    const pdfExtractHint = document.getElementById('pdf-extract-hint');
 
+    pdfExtractInput.addEventListener('change', e => {
+      if (e.target.files.length) {
+        currentExtractPdf = e.target.files[0];
+        pdfExtractTitle.textContent = currentExtractPdf.name;
+        pdfExtractHint.textContent = `${formatBytes(currentExtractPdf.size)} &bull; Rendering preview...`;
+        renderPdfInPreview(currentExtractPdf, currentExtractPdf.name);
+        checkExtractReady();
+      }
+    });
+
+    pdfExtractPages.addEventListener('input', checkExtractReady);
+
+    function checkExtractReady() {
+      const hasFile = currentExtractPdf !== null;
+      const hasPages = pdfExtractPages.value.trim().length > 0;
+      btnPdfExtractRun.disabled = !(hasFile && hasPages);
+    }
+
+    btnPdfExtractRun.addEventListener('click', async () => {
+      if (!currentExtractPdf) return;
+      const pages = pdfExtractPages.value.trim();
       hideMsg('pdf-extract-msg');
       btnPdfExtractRun.disabled = true;
       btnPdfExtractRun.innerHTML = '<span class="spinner"></span> <span>Extracting pages...</span>';
 
       const formData = new FormData();
-      formData.append('file', currentFile);
+      formData.append('file', currentExtractPdf);
       formData.append('pages', pages);
 
       try {
         const res = await fetch('/api/pdf/extract', { method: 'POST', body: formData });
         if (!res.ok) {
-          const errData = await res.json().catch(() => ({ error: 'PDF extract failed' }));
-          showMsg('pdf-extract-msg', 'error', errData.error || 'PDF extract failed');
+          const errData = await res.json().catch(() => ({ error: 'Extraction failed' }));
+          showMsg('pdf-extract-msg', 'error', errData.error || 'Extraction failed');
         } else {
           const blob = await res.blob();
           const disp = res.headers.get('content-disposition');
@@ -1398,6 +1938,8 @@
             const match = disp.match(/filename="?([^"]+)"?/);
             if (match && match[1]) downloadName = match[1];
           }
+
+          renderPdfInPreview(blob, downloadName);
 
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
@@ -1408,7 +1950,7 @@
           a.remove();
           URL.revokeObjectURL(url);
 
-          showMsg('pdf-extract-msg', 'success', `Saved ${downloadName} (${formatBytes(blob.size)})`);
+          showMsg('pdf-extract-msg', 'success', `Extracted pages [${pages}] &rarr; ${downloadName} (${formatBytes(blob.size)})`);
         }
       } catch (err) {
         showMsg('pdf-extract-msg', 'error', 'Error: ' + err.message);
@@ -1418,7 +1960,172 @@
       }
     });
 
-    // Fetch Capabilities and Packs on load
+    // --- PDF Inspect Tool ---
+    const pdfInspectInput = document.getElementById('pdf-inspect-input');
+    const pdfInspectTitle = document.getElementById('pdf-inspect-title');
+
+    pdfInspectInput.addEventListener('change', async e => {
+      if (!e.target.files.length) return;
+      currentInspectPdf = e.target.files[0];
+      pdfInspectTitle.textContent = currentInspectPdf.name;
+      hideMsg('pdf-inspect-msg');
+
+      renderPdfInPreview(currentInspectPdf, currentInspectPdf.name);
+
+      const formData = new FormData();
+      formData.append('file', currentInspectPdf);
+
+      try {
+        const res = await fetch('/api/inspect', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (!res.ok) {
+          showMsg('pdf-inspect-msg', 'error', data.error || 'Inspection failed');
+          return;
+        }
+
+        const inspectResult = document.getElementById('pdf-inspect-result');
+        const specGrid = document.getElementById('pdf-inspect-specs');
+        specGrid.innerHTML = '';
+
+        const items = [
+          { key: 'Format', val: data.format },
+          { key: 'Page Count', val: `${data.properties.page_count} pages` },
+          { key: 'PDF Version', val: data.properties.pdf_version || '1.7' },
+          { key: 'File Size', val: `${formatBytes(data.bytes)} (${data.bytes.toLocaleString()} bytes)` },
+        ];
+
+        if (data.properties.page_count) {
+          previewPageTag.textContent = `${data.properties.page_count} Pages`;
+          previewPageTag.style.display = 'inline-block';
+        }
+
+        items.forEach(item => {
+          const div = document.createElement('div');
+          div.className = 'spec-item';
+          div.innerHTML = `<div class="spec-key">${item.key}</div><div class="spec-val">${item.val}</div>`;
+          specGrid.appendChild(div);
+        });
+
+        inspectResult.style.display = 'block';
+      } catch (err) {
+        showMsg('pdf-inspect-msg', 'error', 'Error inspecting document: ' + err.message);
+      }
+    });
+
+    // ============================================================
+    // SYSTEM & CAPABILITY PACKS
+    // ============================================================
+    async function installPack(file, msgBoxId) {
+      if (!file) return;
+      hideMsg(msgBoxId);
+      const msgEl = document.getElementById(msgBoxId);
+      if (msgEl) {
+        msgEl.className = 'msg-box';
+        msgEl.style.display = 'block';
+        msgEl.style.background = 'var(--surface-3)';
+        msgEl.style.color = 'var(--text)';
+        msgEl.innerHTML = `<span class="spinner"></span> <span>Installing '${file.name}' locally...</span>`;
+      }
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const res = await fetch('/api/packs/install', {
+          method: 'POST',
+          body: formData,
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          showMsg(msgBoxId, 'error', `Installation error: ${data.error || 'Failed to install pack'}`);
+        } else {
+          showMsg(msgBoxId, 'success', `Installed ${data.name || data.id} v${data.version || ''} successfully!`);
+          await loadCapabilitiesAndPacks();
+        }
+      } catch (err) {
+        showMsg(msgBoxId, 'error', `Network error: ${err.message}`);
+      }
+    }
+
+    function wirePackDropzone(dzId, inputId, msgId) {
+      const dz = document.getElementById(dzId);
+      const inp = document.getElementById(inputId);
+      if (!dz || !inp) return;
+
+      ['dragenter', 'dragover'].forEach(evt => {
+        dz.addEventListener(evt, e => {
+          e.preventDefault();
+          dz.classList.add('dragover');
+        });
+      });
+      ['dragleave', 'drop'].forEach(evt => {
+        dz.addEventListener(evt, e => {
+          e.preventDefault();
+          dz.classList.remove('dragover');
+        });
+      });
+      dz.addEventListener('drop', e => {
+        if (e.dataTransfer.files && e.dataTransfer.files.length) {
+          installPack(e.dataTransfer.files[0], msgId);
+        }
+      });
+      inp.addEventListener('change', e => {
+        if (e.target.files && e.target.files.length) {
+          installPack(e.target.files[0], msgId);
+          inp.value = '';
+        }
+      });
+    }
+
+    wirePackDropzone('pdf-pack-dropzone', 'pdf-pack-input', 'pdf-pack-msg');
+    wirePackDropzone('system-pack-dropzone', 'system-pack-input', 'system-pack-msg');
+
+    // Clipboard Copy Buttons
+    document.querySelectorAll('.btn-copy').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const cmd = btn.dataset.cmd;
+        if (!cmd) return;
+        try {
+          await navigator.clipboard.writeText(cmd);
+          const orig = btn.textContent;
+          btn.textContent = 'Copied!';
+          setTimeout(() => { btn.textContent = orig; }, 1500);
+        } catch (e) {
+          prompt('Copy command:', cmd);
+        }
+      });
+    });
+
+    // Re-check Engine Button
+    const btnRecheck = document.getElementById('btn-recheck-engine');
+    if (btnRecheck) {
+      btnRecheck.addEventListener('click', async () => {
+        btnRecheck.disabled = true;
+        btnRecheck.innerHTML = '<span class="spinner"></span> <span>Checking...</span>';
+        await loadCapabilitiesAndPacks();
+        btnRecheck.disabled = false;
+        btnRecheck.innerHTML = '<span>&#8635;</span> <span>Re-check Engine</span>';
+      });
+    }
+
+    // Toggle Pack Manager in active banner
+    const btnToggleInstaller = document.getElementById('btn-toggle-pack-installer');
+    const pdfSetupCard = document.getElementById('pdf-engine-setup-card');
+    if (btnToggleInstaller && pdfSetupCard) {
+      btnToggleInstaller.addEventListener('click', () => {
+        const isHidden = pdfSetupCard.style.display === 'none' || getComputedStyle(pdfSetupCard).display === 'none';
+        if (isHidden) {
+          pdfSetupCard.style.display = 'block';
+          pdfSetupCard.dataset.manuallyOpened = 'true';
+          btnToggleInstaller.innerHTML = 'Hide Pack Manager &uarr;';
+        } else {
+          pdfSetupCard.style.display = 'none';
+          pdfSetupCard.dataset.manuallyOpened = 'false';
+          btnToggleInstaller.innerHTML = 'Pack Manager &darr;';
+        }
+      });
+    }
+
     async function loadCapabilitiesAndPacks() {
       try {
         const [capRes, packsRes] = await Promise.all([
@@ -1426,9 +2133,14 @@
           fetch('/api/packs')
         ]);
 
+        let isPdfReady = false;
+        let pdfSource = '';
+
         if (capRes.ok) {
           const capData = await capRes.json();
           document.getElementById('version-badge').textContent = 'v' + capData.version;
+          isPdfReady = !!capData.pdf_available;
+          pdfSource = capData.pdf_source || '';
 
           const tableBody = document.getElementById('ops-table-body');
           tableBody.innerHTML = '';
@@ -1451,13 +2163,7 @@
           const packsTableBody = document.getElementById('packs-table-body');
           packsTableBody.innerHTML = '';
 
-          let pdfInstalled = false;
-
           packsData.forEach(p => {
-            if (p.capability === 'pdf' && p.installed && p.healthy) {
-              pdfInstalled = true;
-            }
-
             const tr = document.createElement('tr');
             let badge = '<span class="badge-planned">not installed</span>';
             if (p.installed && p.healthy) {
@@ -1474,18 +2180,41 @@
             `;
             packsTableBody.appendChild(tr);
           });
+        }
 
-          const badgePdf = document.getElementById('badge-pdf');
-          const descPdf = document.getElementById('desc-pdf');
-          if (pdfInstalled) {
-            badgePdf.className = 'badge-installed';
-            badgePdf.textContent = 'Installed';
-            descPdf.textContent = 'qpdf adapter ready for inspect, merge, and extract';
-          } else {
-            badgePdf.className = 'badge-planned';
-            badgePdf.textContent = 'Requires Pack';
-            descPdf.textContent = 'Install qpdf pack via CLI (`foldshift pack install`) or system PATH';
+        // Update PDF Engine banners & badges
+        const activeBanner = document.getElementById('pdf-engine-active-banner');
+        const setupCard = document.getElementById('pdf-engine-setup-card');
+        const sourceLabel = document.getElementById('pdf-engine-source-label');
+        const badgePdf = document.getElementById('badge-pdf');
+        const descPdf = document.getElementById('desc-pdf');
+        const systemTag = document.getElementById('domain-system-tag');
+
+        if (isPdfReady) {
+          if (activeBanner) activeBanner.style.display = 'flex';
+          if (setupCard && setupCard.dataset.manuallyOpened !== 'true') {
+            setupCard.style.display = 'none';
           }
+          if (sourceLabel) sourceLabel.textContent = pdfSource || 'Local process ready';
+          if (badgePdf) {
+            badgePdf.className = 'badge-installed';
+            badgePdf.textContent = 'Active';
+          }
+          if (descPdf) {
+            descPdf.textContent = pdfSource ? `qpdf engine active (${pdfSource})` : 'qpdf adapter ready for inspect, merge, and extract';
+          }
+          if (systemTag) systemTag.textContent = 'Engines Active';
+        } else {
+          if (activeBanner) activeBanner.style.display = 'none';
+          if (setupCard) setupCard.style.display = 'block';
+          if (badgePdf) {
+            badgePdf.className = 'badge-planned';
+            badgePdf.textContent = 'Requires Setup';
+          }
+          if (descPdf) {
+            descPdf.textContent = 'qpdf engine not found. Install capability pack or install via package manager.';
+          }
+          if (systemTag) systemTag.textContent = 'qpdf missing';
         }
       } catch (e) {
         console.error('Failed to load capabilities or packs', e);

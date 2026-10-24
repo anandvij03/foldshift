@@ -19,6 +19,8 @@ pub struct SystemStatus {
     pub version: &'static str,
     pub supported_extensions: &'static [&'static str],
     pub capabilities: Vec<foldshift_core::OperationInfo>,
+    pub pdf_available: bool,
+    pub pdf_source: Option<String>,
 }
 
 pub fn app() -> Router {
@@ -26,6 +28,7 @@ pub fn app() -> Router {
         .route("/", get(serve_index))
         .route("/api/capabilities", get(api_capabilities))
         .route("/api/packs", get(api_packs))
+        .route("/api/packs/install", post(api_packs_install))
         .route("/api/inspect", post(api_inspect))
         .route("/api/convert", post(api_convert))
         .route("/api/resize", post(api_resize))
@@ -76,7 +79,19 @@ async fn serve_index() -> Html<&'static str> {
 }
 
 async fn api_capabilities() -> Json<SystemStatus> {
-    let is_pdf_available = foldshift_core::pack::is_capability_installed("pdf");
+    let (is_pdf_available, pdf_source) = match foldshift_pdf::resolve_qpdf_engine() {
+        Ok(path) => {
+            let src = if foldshift_core::pack::is_capability_installed("pdf") {
+                "Pack"
+            } else if std::env::var("FOLDSHIFT_QPDF_PATH").is_ok() {
+                "Environment variable (FOLDSHIFT_QPDF_PATH)"
+            } else {
+                "System PATH"
+            };
+            (true, Some(format!("{} ({})", src, path.display())))
+        }
+        Err(_) => (false, None),
+    };
     let is_media_available = foldshift_core::pack::is_capability_installed("media");
     Json(SystemStatus {
         version: "0.1.0",
@@ -87,11 +102,97 @@ async fn api_capabilities() -> Json<SystemStatus> {
             "media" => is_media_available,
             _ => false,
         }),
+        pdf_available: is_pdf_available,
+        pdf_source,
     })
 }
 
 async fn api_packs() -> Json<Vec<foldshift_core::pack::PackStatus>> {
     Json(foldshift_core::pack::list_pack_statuses())
+}
+
+async fn api_packs_install(
+    mut multipart: Multipart,
+) -> Result<Json<foldshift_core::pack::InstalledPack>, (StatusCode, Json<serde_json::Value>)> {
+    let mut file_bytes: Option<(String, Vec<u8>)> = None;
+    let mut expected_capability: Option<String> = None;
+    let mut expected_sha256: Option<String> = None;
+
+    while let Ok(Some(field)) = multipart.next_field().await {
+        let name = field.name().unwrap_or_default().to_string();
+        match name.as_str() {
+            "file" | "pack" => {
+                let filename = field.file_name().unwrap_or("pack.zip").to_string();
+                let bytes = field.bytes().await.map_err(|e| {
+                    (
+                        StatusCode::BAD_REQUEST,
+                        Json(json!({ "error": format!("Failed reading pack file bytes: {}", e) })),
+                    )
+                })?;
+                file_bytes = Some((filename, bytes.to_vec()));
+            }
+            "capability" => {
+                if let Ok(text) = field.text().await {
+                    let trimmed = text.trim();
+                    if !trimmed.is_empty() {
+                        expected_capability = Some(trimmed.to_string());
+                    }
+                }
+            }
+            "sha256" => {
+                if let Ok(text) = field.text().await {
+                    let trimmed = text.trim();
+                    if !trimmed.is_empty() {
+                        expected_sha256 = Some(trimmed.to_string());
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let (_filename, bytes) = file_bytes.ok_or_else(|| {
+        (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "No pack archive file uploaded" })),
+        )
+    })?;
+
+    let temp_file = tempfile::Builder::new()
+        .suffix(".zip")
+        .tempfile()
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?;
+
+    std::fs::write(temp_file.path(), &bytes).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    let options = foldshift_core::pack::InstallOptions {
+        expected_capability: expected_capability.as_deref(),
+        expected_sha256: expected_sha256.as_deref(),
+    };
+
+    let installed = foldshift_core::pack::install_pack_from_archive(
+        temp_file.path(),
+        &foldshift_core::pack::packs_dir(),
+        &options,
+    )
+    .map_err(|e| {
+        (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Json(json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    Ok(Json(installed))
 }
 
 async fn api_inspect(

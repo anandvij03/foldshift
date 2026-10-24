@@ -63,7 +63,11 @@ async fn send_request(
     stream.write_all(body).await.unwrap();
 
     let mut response_bytes = Vec::new();
-    stream.read_to_end(&mut response_bytes).await.unwrap();
+    match stream.read_to_end(&mut response_bytes).await {
+        Ok(_) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::ConnectionReset => {}
+        Err(e) => panic!("read_to_end failed: {}", e),
+    }
 
     let header_end = response_bytes
         .windows(4)
@@ -80,8 +84,11 @@ async fn send_request(
     (headers_part, body_part)
 }
 
+static ENV_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 #[tokio::test]
 async fn test_index_and_capabilities_over_tcp() {
+    let _guard = ENV_LOCK.lock().await;
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
 
@@ -255,6 +262,7 @@ fn create_sample_pdf(pages: u32) -> Vec<u8> {
 
 #[tokio::test]
 async fn test_api_pdf_endpoints() {
+    let _guard = ENV_LOCK.lock().await;
     let mock_path = mock_qpdf_bin();
     unsafe { std::env::set_var("FOLDSHIFT_QPDF_PATH", &mock_path) };
 
@@ -289,6 +297,74 @@ async fn test_api_pdf_endpoints() {
     assert!(head_ext.starts_with("HTTP/1.1 200 OK"));
     assert!(head_ext.contains("application/pdf"));
     assert!(!body_ext.is_empty());
+
+    unsafe { std::env::remove_var("FOLDSHIFT_QPDF_PATH") };
+}
+
+#[tokio::test]
+async fn test_api_packs_install_validation() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    tokio::spawn(async move {
+        axum::serve(listener, foldshift_web::app()).await.unwrap();
+    });
+
+    let boundary = "BOUNDARYPACK";
+
+    // 1. Missing file field entirely -> 400 Bad Request
+    let empty_body = build_multipart(boundary, None, &[("capability", "pdf")]);
+    let ct = format!("multipart/form-data; boundary={}", boundary);
+    let (head_empty, body_empty) =
+        send_request(addr, "POST", "/api/packs/install", &ct, &empty_body).await;
+    assert!(
+        head_empty.starts_with("HTTP/1.1 400 Bad Request"),
+        "Expected 400, got: {}",
+        head_empty
+    );
+    assert!(String::from_utf8_lossy(&body_empty).contains("error"));
+
+    // 2. Corrupted / non-zip archive payload -> 422 Unprocessable Entity
+    let bad_zip_body = build_multipart(
+        boundary,
+        Some(("file", "invalid_pack.zip", b"not a valid zip file payload")),
+        &[("capability", "pdf")],
+    );
+    let (head_bad, body_bad) =
+        send_request(addr, "POST", "/api/packs/install", &ct, &bad_zip_body).await;
+    assert!(
+        head_bad.starts_with("HTTP/1.1 422 Unprocessable Entity"),
+        "Expected 422, got: {}",
+        head_bad
+    );
+    let err_json: serde_json::Value = serde_json::from_slice(&body_bad).unwrap();
+    assert!(err_json["error"].is_string());
+}
+
+#[tokio::test]
+async fn test_api_capabilities_dynamic_pdf_detection() {
+    let _guard = ENV_LOCK.lock().await;
+    let mock_path = mock_qpdf_bin();
+    unsafe { std::env::set_var("FOLDSHIFT_QPDF_PATH", &mock_path) };
+
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    tokio::spawn(async move {
+        axum::serve(listener, foldshift_web::app()).await.unwrap();
+    });
+
+    let (head, body) =
+        send_request(addr, "GET", "/api/capabilities", "application/json", b"").await;
+    assert!(head.starts_with("HTTP/1.1 200 OK"));
+    let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(json["pdf_available"], true);
+    assert!(
+        json["pdf_source"]
+            .as_str()
+            .unwrap()
+            .contains("FOLDSHIFT_QPDF_PATH")
+    );
 
     unsafe { std::env::remove_var("FOLDSHIFT_QPDF_PATH") };
 }
