@@ -87,3 +87,29 @@ Reviewed commits: `92c5ddb` (FS-020), `ee0b66c` (FS-021), `522791f` (FS-022)
    - **Audit**: Verified that QPDF is governed by the Apache 2.0 license, and that pack manifests mandate `license` and `notice` tracking.
    - **Documentation**: Recorded license obligations in `docs/PROCESS-LIMITS-AND-LICENSES.md`.
 
+---
+
+## Milestone 4 Review & Audit (FS-030)
+
+Audit date: 24 October 2026  
+Reviewed commits: `72e4186` (FS-030 core batch), `41c8612` (web & installers)  
+
+### Findings and Dispositions
+
+1. **Batch Isolation & Independent Failures**:
+   - **Verified**: Batch processing loops execute items sequentially. If item $i$ encounters an error (corrupted payload, unsupported format, or collision without force), the error is isolated to that item and execution proceeds without halting the batch.
+   - **Verified**: Atomic publication via `tempfile` ensures in-progress failures never leave corrupt or partial outputs in destination directories.
+
+2. **Naming Templates and Path Safety**:
+   - **Verified**: Placeholders `{stem}`, `{name}`, `{ext}`, `{index}`, and zero-padded indices resolve strictly to base filenames.
+   - **Verified**: Directory traversal (`..`) and path separators (`/`, `\`) in pattern resolutions are rejected with `FcError::InvalidOption`.
+   - **Verified**: Intra-batch collisions (where multiple input files map to the same output path) are caught early during batch planning.
+
+3. **Cooperative Cancellation & Signal Handling**:
+   - **Verified**: `CancellationToken` enables clean cancellation. CLI intercepts `SIGINT` (Ctrl+C) via `ctrlc`, safely completing active atomic writes and marking remaining items as cancelled without data corruption.
+   - **Verified**: A second interrupt triggers an immediate emergency exit (`std::process::exit(130)`).
+
+4. **Dependency Minimality**:
+   - **Verified**: Core-only profile has 0 image codecs. `ctrlc` added solely to CLI for cross-platform signal management without impacting core libraries.
+
+
