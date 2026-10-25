@@ -1009,6 +1009,10 @@
         <span>Image Studio</span>
         <span class="domain-tag">6 Formats</span>
       </button>
+      <button class="domain-btn" data-domain="domain-audio">
+        <span>Audio Studio</span>
+        <span class="domain-tag">8 Formats</span>
+      </button>
       <button class="domain-btn" data-domain="domain-pdfs">
         <span>PDF Studio</span>
         <span class="domain-tag">Merge &bull; Extract</span>
@@ -1142,7 +1146,176 @@
     </div>
 
     <!-- ============================================================ -->
-    <!-- DOMAIN 2: PDF STUDIO (WITH SIDE-BY-SIDE PREVIEW)             -->
+    <!-- DOMAIN 2: AUDIO STUDIO                                       -->
+    <!-- ============================================================ -->
+    <div class="domain-panel" id="domain-audio">
+      <!-- Engine Active Banner (shown when media engine is healthy) -->
+      <div class="engine-active-banner" id="audio-engine-active-banner">
+        <div class="engine-active-left">
+          <span class="engine-active-title"><span class="pulse-dot"></span> Media Engine Active (ffmpeg)</span>
+          <span class="engine-active-meta" id="audio-engine-source-label">Local process</span>
+        </div>
+        <div>
+          <button type="button" class="btn-clear" id="btn-toggle-audio-pack-installer" style="font-size: 11px;">Pack Manager &darr;</button>
+        </div>
+      </div>
+
+      <!-- Engine Setup Card (shown when media engine is missing or on demand) -->
+      <div class="engine-setup-card" id="audio-engine-setup-card">
+        <div class="engine-setup-header">
+          <div class="engine-setup-title">
+            <span style="color: var(--warning);">&#9888;</span>
+            <span>Media Engine Setup Required</span>
+          </div>
+          <span class="badge-warning">Missing Engine</span>
+        </div>
+        <div class="engine-setup-desc">
+          FoldShift converts audio streams and inspects audio metadata 100% locally on your machine via <code>ffmpeg</code>. Files are never uploaded to any remote server. To enable Audio & Video features, choose either method below:
+        </div>
+
+        <div class="engine-setup-grid">
+          <!-- Method 1: Drop Pack Archive -->
+          <div class="setup-box">
+            <div class="setup-box-title">
+              <span>Option 1 &bull; Drop Capability Pack</span>
+              <span class="domain-tag">Offline .zip</span>
+            </div>
+            <div class="dropzone" id="media-pack-dropzone" style="padding: 18px 12px; margin-bottom: 8px;">
+              <input type="file" id="media-pack-input" accept=".zip,application/zip">
+              <div class="dropzone-icon">&boxbox;</div>
+              <div class="dropzone-title">Drop <code>foldshift-pack-media-*.zip</code> here</div>
+              <div class="dropzone-hint">Local unpack & verification</div>
+            </div>
+            <div class="msg-box" id="media-pack-msg" style="margin-top: 4px;"></div>
+          </div>
+
+          <!-- Method 2: System Package Manager -->
+          <div class="setup-box">
+            <div class="setup-box-title">
+              <span>Option 2 &bull; System Package</span>
+              <span class="domain-tag">Package Manager</span>
+            </div>
+            <div class="cmd-list">
+              <div class="cmd-row">
+                <span class="cmd-label">Windows</span>
+                <span class="cmd-code">winget install Gyan.FFmpeg</span>
+                <button type="button" class="btn-copy" data-cmd="winget install Gyan.FFmpeg">Copy</button>
+              </div>
+              <div class="cmd-row">
+                <span class="cmd-label">macOS</span>
+                <span class="cmd-code">brew install ffmpeg</span>
+                <button type="button" class="btn-copy" data-cmd="brew install ffmpeg">Copy</button>
+              </div>
+              <div class="cmd-row">
+                <span class="cmd-label">Linux</span>
+                <span class="cmd-code">sudo apt install ffmpeg</span>
+                <button type="button" class="btn-copy" data-cmd="sudo apt install ffmpeg">Copy</button>
+              </div>
+            </div>
+            <button type="button" class="btn-recheck" id="btn-recheck-audio-engine">
+              <span>&#8635;</span> <span>Re-check Engine</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Audio Dropzone & Selected Bar -->
+      <div id="audio-upload-section">
+        <div class="dropzone" id="audio-dropzone">
+          <input type="file" id="audio-file-input" accept="audio/*,.mp3,.wav,.flac,.ogg,.m4a,.aac,.wma,.opus">
+          <div class="dropzone-icon">&boxbox;</div>
+          <div class="dropzone-title">Drop an audio file here or click to choose</div>
+          <div class="dropzone-hint">Supported: MP3, WAV, FLAC, OGG, M4A, AAC, WMA, OPUS (Max 100MB)</div>
+        </div>
+
+        <div class="file-bar" id="audio-file-bar">
+          <div class="file-info">
+            <div class="file-thumb" id="audio-preview">&#9835;</div>
+            <div class="file-meta">
+              <div class="file-name" id="audio-file-name">audio.mp3</div>
+              <div class="file-specs" id="audio-file-specs">0 KB</div>
+            </div>
+          </div>
+          <button class="btn-clear" id="audio-btn-clear" type="button">Remove</button>
+        </div>
+      </div>
+
+      <!-- Audio Subnav -->
+      <div class="subnav">
+        <button class="subnav-btn active" data-sub="audio-sub-convert">Convert</button>
+        <button class="subnav-btn" data-sub="audio-sub-inspect">Inspect</button>
+      </div>
+
+      <!-- Audio Convert Subpanel -->
+      <div class="sub-panel active" id="audio-sub-convert">
+        <div class="card">
+          <div class="form-group">
+            <label class="form-label">Target Format</label>
+            <div class="format-grid" id="audio-convert-formats">
+              <button type="button" class="format-btn active" data-fmt="mp3">MP3</button>
+              <button type="button" class="format-btn" data-fmt="wav">WAV</button>
+              <button type="button" class="format-btn" data-fmt="flac">FLAC</button>
+              <button type="button" class="format-btn" data-fmt="ogg">OGG</button>
+              <button type="button" class="format-btn" data-fmt="m4a">M4A</button>
+              <button type="button" class="format-btn" data-fmt="aac">AAC</button>
+              <button type="button" class="format-btn" data-fmt="opus">OPUS</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Audio Bitrate</label>
+            <div class="format-grid" id="audio-bitrate-options">
+              <button type="button" class="format-btn" data-bitrate="128k">128 kbps</button>
+              <button type="button" class="format-btn" data-bitrate="192k">192 kbps</button>
+              <button type="button" class="format-btn active" data-bitrate="256k">256 kbps</button>
+              <button type="button" class="format-btn" data-bitrate="320k">320 kbps</button>
+              <button type="button" class="format-btn" data-bitrate="">Default</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Sample Rate</label>
+            <div class="format-grid" id="audio-samplerate-options">
+              <button type="button" class="format-btn active" data-sr="">Preserve original</button>
+              <button type="button" class="format-btn" data-sr="44100">44.1 kHz</button>
+              <button type="button" class="format-btn" data-sr="48000">48 kHz</button>
+              <button type="button" class="format-btn" data-sr="96000">96 kHz</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Audio Channels</label>
+            <div class="format-grid" id="audio-channels-options">
+              <button type="button" class="format-btn active" data-ch="">Preserve original</button>
+              <button type="button" class="format-btn" data-ch="1">Mono (1 ch)</button>
+              <button type="button" class="format-btn" data-ch="2">Stereo (2 ch)</button>
+            </div>
+          </div>
+
+          <button class="btn-action" id="btn-audio-convert-run" disabled>
+            <span>Convert & Download</span>
+          </button>
+          <div class="msg-box" id="audio-convert-msg"></div>
+        </div>
+      </div>
+
+      <!-- Audio Inspect Subpanel -->
+      <div class="sub-panel" id="audio-sub-inspect">
+        <div class="card">
+          <div id="audio-inspect-empty" style="text-align: center; color: var(--text-muted); padding: 24px 0;">
+            Select an audio file above to inspect duration, bitrate, sample rate, channels, and codec.
+          </div>
+          <div id="audio-inspect-result" style="display: none;">
+            <div style="font-weight: 600; font-size: 13px; margin-bottom: 8px;">Audio Stream Inspection Report</div>
+            <div class="spec-grid" id="audio-inspect-specs"></div>
+          </div>
+          <div class="msg-box" id="audio-inspect-msg"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- DOMAIN 3: PDF STUDIO (WITH SIDE-BY-SIDE PREVIEW)             -->
     <!-- ============================================================ -->
     <div class="domain-panel" id="domain-pdfs">
       <!-- Engine Active Banner (shown when PDF engine is healthy) -->
@@ -1352,10 +1525,10 @@
           </div>
           <div class="cap-box" id="cap-box-media">
             <div class="cap-header">
-              <span class="cap-name">MEDIA Engine</span>
-              <span class="badge-planned">Planned M4</span>
+              <span class="cap-name">MEDIA Engine (ffmpeg)</span>
+              <span class="badge-planned" id="badge-media">Checking...</span>
             </div>
-            <div class="cap-desc">Audio/video stream operations (FFmpeg pack)</div>
+            <div class="cap-desc" id="desc-media">Audio/video stream operations (FFmpeg pack)</div>
           </div>
         </div>
 
@@ -1443,6 +1616,7 @@
     }
 
     setupSubnav('#domain-images');
+    setupSubnav('#domain-audio');
     setupSubnav('#domain-pdfs');
 
     // ============================================================
@@ -1724,6 +1898,208 @@
         btnResize.innerHTML = '<span>Resize & Download</span>';
       }
     });
+
+    // ============================================================
+    // AUDIO STUDIO LOGIC
+    // ============================================================
+    let currentAudioFile = null;
+    let selectedAudioConvertFormat = 'mp3';
+    let selectedAudioBitrate = '256k';
+    let selectedAudioSampleRate = '';
+    let selectedAudioChannels = '';
+
+    const audioDropzone = document.getElementById('audio-dropzone');
+    const audioFileInput = document.getElementById('audio-file-input');
+    const audioFileBar = document.getElementById('audio-file-bar');
+    const audioFileName = document.getElementById('audio-file-name');
+    const audioFileSpecs = document.getElementById('audio-file-specs');
+    const audioBtnClear = document.getElementById('audio-btn-clear');
+
+    function handleSelectedAudio(file) {
+      if (!file) return;
+      currentAudioFile = file;
+
+      audioFileName.textContent = file.name;
+      audioFileSpecs.textContent = formatBytes(file.size);
+
+      audioDropzone.style.display = 'none';
+      audioFileBar.style.display = 'flex';
+
+      const btnRun = document.getElementById('btn-audio-convert-run');
+      if (btnRun) btnRun.disabled = false;
+
+      inspectAudio(file);
+    }
+
+    function clearAudio() {
+      currentAudioFile = null;
+      if (audioFileInput) audioFileInput.value = '';
+      if (audioDropzone) audioDropzone.style.display = 'block';
+      if (audioFileBar) audioFileBar.style.display = 'none';
+
+      const btnRun = document.getElementById('btn-audio-convert-run');
+      if (btnRun) btnRun.disabled = true;
+      const inspectRes = document.getElementById('audio-inspect-result');
+      if (inspectRes) inspectRes.style.display = 'none';
+      const inspectEmpty = document.getElementById('audio-inspect-empty');
+      if (inspectEmpty) inspectEmpty.style.display = 'block';
+
+      hideMsg('audio-convert-msg');
+      hideMsg('audio-inspect-msg');
+    }
+
+    if (audioFileInput) {
+      audioFileInput.addEventListener('change', e => {
+        if (e.target.files.length) handleSelectedAudio(e.target.files[0]);
+      });
+    }
+    if (audioBtnClear) audioBtnClear.addEventListener('click', clearAudio);
+
+    if (audioDropzone) {
+      ['dragenter', 'dragover'].forEach(name => {
+        audioDropzone.addEventListener(name, e => {
+          e.preventDefault();
+          audioDropzone.classList.add('dragover');
+        });
+      });
+      ['dragleave', 'drop'].forEach(name => {
+        audioDropzone.addEventListener(name, e => {
+          e.preventDefault();
+          audioDropzone.classList.remove('dragover');
+        });
+      });
+      audioDropzone.addEventListener('drop', e => {
+        if (e.dataTransfer.files.length) handleSelectedAudio(e.dataTransfer.files[0]);
+      });
+    }
+
+    // Audio Formats
+    document.querySelectorAll('#audio-convert-formats .format-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#audio-convert-formats .format-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        selectedAudioConvertFormat = btn.dataset.fmt;
+      });
+    });
+
+    // Bitrate Options
+    document.querySelectorAll('#audio-bitrate-options .format-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#audio-bitrate-options .format-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        selectedAudioBitrate = btn.dataset.bitrate;
+      });
+    });
+
+    // Sample Rate Options
+    document.querySelectorAll('#audio-samplerate-options .format-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#audio-samplerate-options .format-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        selectedAudioSampleRate = btn.dataset.sr;
+      });
+    });
+
+    // Channels Options
+    document.querySelectorAll('#audio-channels-options .format-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#audio-channels-options .format-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        selectedAudioChannels = btn.dataset.ch;
+      });
+    });
+
+    // Inspect Audio Action
+    async function inspectAudio(file) {
+      hideMsg('audio-inspect-msg');
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const res = await fetch('/api/audio/inspect', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (!res.ok) {
+          showMsg('audio-inspect-msg', 'error', data.error || 'Inspection failed');
+          return;
+        }
+
+        document.getElementById('audio-inspect-empty').style.display = 'none';
+        const inspectResult = document.getElementById('audio-inspect-result');
+        const specGrid = document.getElementById('audio-inspect-specs');
+        specGrid.innerHTML = '';
+
+        const items = [
+          { key: 'Format', val: data.format },
+          { key: 'File Size', val: `${formatBytes(data.bytes)} (${data.bytes.toLocaleString()} bytes)` },
+        ];
+        if (data.properties.duration) items.push({ key: 'Duration', val: data.properties.duration });
+        if (data.properties.bitrate) items.push({ key: 'Bitrate', val: data.properties.bitrate });
+        if (data.properties.sample_rate) items.push({ key: 'Sample Rate', val: data.properties.sample_rate });
+        if (data.properties.channels) items.push({ key: 'Channels', val: data.properties.channels });
+        if (data.properties.codec) items.push({ key: 'Codec', val: data.properties.codec });
+
+        items.forEach(item => {
+          const div = document.createElement('div');
+          div.className = 'spec-item';
+          div.innerHTML = `<div class="spec-key">${item.key}</div><div class="spec-val">${item.val}</div>`;
+          specGrid.appendChild(div);
+        });
+
+        inspectResult.style.display = 'block';
+      } catch (err) {
+        showMsg('audio-inspect-msg', 'error', 'Inspection error: ' + err.message);
+      }
+    }
+
+    // Convert Audio Action
+    const btnAudioConvert = document.getElementById('btn-audio-convert-run');
+    if (btnAudioConvert) {
+      btnAudioConvert.addEventListener('click', async () => {
+        if (!currentAudioFile) return;
+        hideMsg('audio-convert-msg');
+        btnAudioConvert.disabled = true;
+        btnAudioConvert.innerHTML = '<span class="spinner"></span> <span>Converting audio locally...</span>';
+
+        const formData = new FormData();
+        formData.append('file', currentAudioFile);
+        formData.append('format', selectedAudioConvertFormat);
+        if (selectedAudioBitrate) formData.append('bitrate', selectedAudioBitrate);
+        if (selectedAudioSampleRate) formData.append('sample_rate', selectedAudioSampleRate);
+        if (selectedAudioChannels) formData.append('channels', selectedAudioChannels);
+
+        try {
+          const res = await fetch('/api/audio/convert', { method: 'POST', body: formData });
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({ error: 'Audio conversion failed' }));
+            showMsg('audio-convert-msg', 'error', errData.error || 'Audio conversion failed');
+          } else {
+            const blob = await res.blob();
+            const disp = res.headers.get('content-disposition');
+            let downloadName = 'converted.' + selectedAudioConvertFormat;
+            if (disp && disp.includes('filename=')) {
+              const match = disp.match(/filename="?([^"]+)"?/);
+              if (match && match[1]) downloadName = match[1];
+            }
+
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = downloadName;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+
+            showMsg('audio-convert-msg', 'success', `Saved ${downloadName} (${formatBytes(blob.size)})`);
+          }
+        } catch (err) {
+          showMsg('audio-convert-msg', 'error', 'Error: ' + err.message);
+        } finally {
+          btnAudioConvert.disabled = false;
+          btnAudioConvert.innerHTML = '<span>Convert & Download</span>';
+        }
+      });
+    }
 
     // ============================================================
     // PDF STUDIO LOGIC (WITH SIDE-BY-SIDE PREVIEW)
@@ -2078,6 +2454,7 @@
     }
 
     wirePackDropzone('pdf-pack-dropzone', 'pdf-pack-input', 'pdf-pack-msg');
+    wirePackDropzone('media-pack-dropzone', 'media-pack-input', 'media-pack-msg');
     wirePackDropzone('system-pack-dropzone', 'system-pack-input', 'system-pack-msg');
 
     // Clipboard Copy Buttons
@@ -2096,7 +2473,7 @@
       });
     });
 
-    // Re-check Engine Button
+    // Re-check Engine Buttons
     const btnRecheck = document.getElementById('btn-recheck-engine');
     if (btnRecheck) {
       btnRecheck.addEventListener('click', async () => {
@@ -2105,6 +2482,17 @@
         await loadCapabilitiesAndPacks();
         btnRecheck.disabled = false;
         btnRecheck.innerHTML = '<span>&#8635;</span> <span>Re-check Engine</span>';
+      });
+    }
+
+    const btnRecheckAudio = document.getElementById('btn-recheck-audio-engine');
+    if (btnRecheckAudio) {
+      btnRecheckAudio.addEventListener('click', async () => {
+        btnRecheckAudio.disabled = true;
+        btnRecheckAudio.innerHTML = '<span class="spinner"></span> <span>Checking...</span>';
+        await loadCapabilitiesAndPacks();
+        btnRecheckAudio.disabled = false;
+        btnRecheckAudio.innerHTML = '<span>&#8635;</span> <span>Re-check Engine</span>';
       });
     }
 
@@ -2126,6 +2514,23 @@
       });
     }
 
+    const btnToggleAudioInstaller = document.getElementById('btn-toggle-audio-pack-installer');
+    const audioSetupCard = document.getElementById('audio-engine-setup-card');
+    if (btnToggleAudioInstaller && audioSetupCard) {
+      btnToggleAudioInstaller.addEventListener('click', () => {
+        const isHidden = audioSetupCard.style.display === 'none' || getComputedStyle(audioSetupCard).display === 'none';
+        if (isHidden) {
+          audioSetupCard.style.display = 'block';
+          audioSetupCard.dataset.manuallyOpened = 'true';
+          btnToggleAudioInstaller.innerHTML = 'Hide Pack Manager &uarr;';
+        } else {
+          audioSetupCard.style.display = 'none';
+          audioSetupCard.dataset.manuallyOpened = 'false';
+          btnToggleAudioInstaller.innerHTML = 'Pack Manager &darr;';
+        }
+      });
+    }
+
     async function loadCapabilitiesAndPacks() {
       try {
         const [capRes, packsRes] = await Promise.all([
@@ -2135,12 +2540,16 @@
 
         let isPdfReady = false;
         let pdfSource = '';
+        let isMediaReady = false;
+        let mediaSource = '';
 
         if (capRes.ok) {
           const capData = await capRes.json();
           document.getElementById('version-badge').textContent = 'v' + capData.version;
           isPdfReady = !!capData.pdf_available;
           pdfSource = capData.pdf_source || '';
+          isMediaReady = !!capData.media_available;
+          mediaSource = capData.media_source || '';
 
           const tableBody = document.getElementById('ops-table-body');
           tableBody.innerHTML = '';
@@ -2203,7 +2612,6 @@
           if (descPdf) {
             descPdf.textContent = pdfSource ? `qpdf engine active (${pdfSource})` : 'qpdf adapter ready for inspect, merge, and extract';
           }
-          if (systemTag) systemTag.textContent = 'Engines Active';
         } else {
           if (activeBanner) activeBanner.style.display = 'none';
           if (setupCard) setupCard.style.display = 'block';
@@ -2214,7 +2622,48 @@
           if (descPdf) {
             descPdf.textContent = 'qpdf engine not found. Install capability pack or install via package manager.';
           }
-          if (systemTag) systemTag.textContent = 'qpdf missing';
+        }
+
+        // Update Media Engine banners & badges
+        const audioActiveBanner = document.getElementById('audio-engine-active-banner');
+        const audioSetupCardEl = document.getElementById('audio-engine-setup-card');
+        const audioSourceLabel = document.getElementById('audio-engine-source-label');
+        const badgeMedia = document.getElementById('badge-media');
+        const descMedia = document.getElementById('desc-media');
+
+        if (isMediaReady) {
+          if (audioActiveBanner) audioActiveBanner.style.display = 'flex';
+          if (audioSetupCardEl && audioSetupCardEl.dataset.manuallyOpened !== 'true') {
+            audioSetupCardEl.style.display = 'none';
+          }
+          if (audioSourceLabel) audioSourceLabel.textContent = mediaSource || 'Local process ready';
+          if (badgeMedia) {
+            badgeMedia.className = 'badge-installed';
+            badgeMedia.textContent = 'Active';
+          }
+          if (descMedia) {
+            descMedia.textContent = mediaSource ? `ffmpeg engine active (${mediaSource})` : 'ffmpeg media adapter ready for inspect and convert';
+          }
+        } else {
+          if (audioActiveBanner) audioActiveBanner.style.display = 'none';
+          if (audioSetupCardEl) audioSetupCardEl.style.display = 'block';
+          if (badgeMedia) {
+            badgeMedia.className = 'badge-planned';
+            badgeMedia.textContent = 'Requires Setup';
+          }
+          if (descMedia) {
+            descMedia.textContent = 'ffmpeg engine not found. Install media pack or install via package manager.';
+          }
+        }
+
+        if (systemTag) {
+          if (isPdfReady && isMediaReady) {
+            systemTag.textContent = 'All Engines Active';
+          } else if (isPdfReady || isMediaReady) {
+            systemTag.textContent = 'Partial Engines';
+          } else {
+            systemTag.textContent = 'Engines Missing';
+          }
         }
       } catch (e) {
         console.error('Failed to load capabilities or packs', e);

@@ -4,6 +4,11 @@
 
 ### Added
 
+- Audio conversion and stream inspection adapter (`foldshift-media`) supporting MP3, WAV, FLAC, OGG, M4A, AAC, WMA, and OPUS.
+- Shared media engine pack architecture (`media`) utilizing FFmpeg with bounded subprocess execution (60s timeout, closed stdin, concurrent pipe draining, 10 MB safety cap).
+- Safe publication and atomic staging in destination parent directory (`tempfile::NamedTempFile`) with same-file overwrite protection.
+- CLI subcommands for audio: `foldshift audio inspect`, `foldshift audio convert`, and `foldshift batch audio` with custom naming pattern resolution, cancellation tokens, and progress reporting.
+- Web UI Audio Studio with format selection, bitrate, sample rate, channels configuration, and live inspection metadata reporting via `/api/audio/inspect` and `/api/audio/convert`.
 - Foldshift CLI for still-image conversion, proportional resizing, inspection,
   and JSON capability reporting.
 - PNG, JPEG, WebP, GIF, BMP, and TIFF support through the `image` library.
@@ -40,4 +45,4 @@
   than converted, preserved, or split into individual frames.
 - Embedded ICC color profiles are not converted or preserved (pixels remain in their source color space).
 - Quality is JPEG-only; WebP output is lossless; transparent JPEG export fails.
-- PDF, media, desktop UI, and isolated workers are not implemented.
+- Video stream operations, desktop UI, and isolated workers are planned.

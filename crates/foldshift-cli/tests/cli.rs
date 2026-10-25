@@ -30,7 +30,7 @@ fn cli_capabilities_reflects_enabled_capabilities() {
 #[cfg(not(feature = "image"))]
 #[test]
 fn cli_core_only_rejects_image_subcommands() {
-    for cmd in ["convert", "image", "inspect", "batch"] {
+    for cmd in ["convert", "image", "inspect"] {
         let result = Command::new(env!("CARGO_BIN_EXE_foldshift"))
             .arg(cmd)
             .output()
@@ -40,6 +40,19 @@ fn cli_core_only_rejects_image_subcommands() {
         assert!(
             stderr.contains("unrecognized subcommand") || stderr.contains("error:"),
             "expected error for '{cmd}', got: {stderr}"
+        );
+    }
+
+    for batch_sub in ["convert", "resize"] {
+        let result = Command::new(env!("CARGO_BIN_EXE_foldshift"))
+            .args(["batch", batch_sub])
+            .output()
+            .unwrap();
+        assert!(!result.status.success());
+        let stderr = String::from_utf8_lossy(&result.stderr);
+        assert!(
+            stderr.contains("unrecognized subcommand") || stderr.contains("error:"),
+            "expected error for 'batch {batch_sub}', got: {stderr}"
         );
     }
 }
@@ -932,4 +945,193 @@ fn cli_batch_resize() {
     );
     assert!(out_dir.join("thumb_orig1.png").exists());
     assert!(out_dir.join("thumb_orig2.png").exists());
+}
+
+fn mock_ffmpeg_bin() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_BIN_EXE_foldshift"))
+        .parent()
+        .unwrap()
+        .join(if cfg!(windows) {
+            "mock-ffmpeg.exe"
+        } else {
+            "mock-ffmpeg"
+        })
+}
+
+#[test]
+fn cli_audio_subcommands_reject_when_uninstalled() {
+    let dir = tempfile::tempdir().unwrap();
+    let audio = dir.path().join("test.mp3");
+    std::fs::write(&audio, b"MOCK_AUDIO_SOURCE").unwrap();
+    let out = dir.path().join("out.wav");
+
+    let res_inspect = Command::new(env!("CARGO_BIN_EXE_foldshift"))
+        .args(["audio", "inspect"])
+        .arg(&audio)
+        .env("PATH", "")
+        .env("FOLDSHIFT_PACKS_DIR", dir.path())
+        .env_remove("FOLDSHIFT_FFMPEG_PATH")
+        .env_remove("FOLDSHIFT_MEDIA_PATH")
+        .output()
+        .unwrap();
+    assert!(!res_inspect.status.success());
+    let stderr = String::from_utf8_lossy(&res_inspect.stderr);
+    assert!(stderr.contains("media engine (ffmpeg) is not installed"));
+
+    let res_convert = Command::new(env!("CARGO_BIN_EXE_foldshift"))
+        .args(["audio", "convert"])
+        .arg(&audio)
+        .arg(&out)
+        .env("PATH", "")
+        .env("FOLDSHIFT_PACKS_DIR", dir.path())
+        .env_remove("FOLDSHIFT_FFMPEG_PATH")
+        .env_remove("FOLDSHIFT_MEDIA_PATH")
+        .output()
+        .unwrap();
+    assert!(!res_convert.status.success());
+}
+
+#[test]
+fn cli_audio_inspect_and_convert_with_mock_engine() {
+    let dir = tempfile::tempdir().unwrap();
+    let audio = dir.path().join("sample.mp3");
+    std::fs::write(&audio, b"MOCK_MP3_DATA").unwrap();
+    let out = dir.path().join("output.wav");
+
+    let mock_bin = mock_ffmpeg_bin();
+
+    // 1. Audio inspect
+    let res_inspect = Command::new(env!("CARGO_BIN_EXE_foldshift"))
+        .args(["audio", "inspect"])
+        .arg(&audio)
+        .arg("--json")
+        .env("FOLDSHIFT_FFMPEG_PATH", &mock_bin)
+        .output()
+        .unwrap();
+    assert!(
+        res_inspect.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&res_inspect.stderr)
+    );
+    let insp_json: serde_json::Value = serde_json::from_slice(&res_inspect.stdout).unwrap();
+    assert_eq!(insp_json["format"], "MP3");
+    assert_eq!(insp_json["properties"]["duration"], "00:03:15.50");
+
+    // 2. Audio convert
+    let res_convert = Command::new(env!("CARGO_BIN_EXE_foldshift"))
+        .args(["audio", "convert"])
+        .arg(&audio)
+        .arg(&out)
+        .args(["--bitrate", "320k"])
+        .env("FOLDSHIFT_FFMPEG_PATH", &mock_bin)
+        .output()
+        .unwrap();
+    assert!(
+        res_convert.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&res_convert.stderr)
+    );
+    assert!(out.exists());
+    let content = std::fs::read(&out).unwrap();
+    assert_eq!(content, b"MOCK_AUDIO_PAYLOAD_1234567890");
+
+    // 3. Same file protection / no clobber without --force
+    let res_noclobber = Command::new(env!("CARGO_BIN_EXE_foldshift"))
+        .args(["audio", "convert"])
+        .arg(&audio)
+        .arg(&out)
+        .env("FOLDSHIFT_FFMPEG_PATH", &mock_bin)
+        .output()
+        .unwrap();
+    assert!(!res_noclobber.status.success());
+
+    // 4. Overwrite with --force
+    let res_force = Command::new(env!("CARGO_BIN_EXE_foldshift"))
+        .args(["audio", "convert"])
+        .arg(&audio)
+        .arg(&out)
+        .arg("--force")
+        .env("FOLDSHIFT_FFMPEG_PATH", &mock_bin)
+        .output()
+        .unwrap();
+    assert!(res_force.status.success());
+}
+
+#[test]
+fn cli_batch_audio_convert() {
+    let dir = tempfile::tempdir().unwrap();
+    let track1 = dir.path().join("track1.wav");
+    let track2 = dir.path().join("track2.wav");
+    let track3 = dir.path().join("track3.wav");
+
+    std::fs::write(&track1, b"WAV1").unwrap();
+    std::fs::write(&track2, b"WAV2").unwrap();
+    std::fs::write(&track3, b"WAV3").unwrap();
+
+    let out_dir = dir.path().join("audio_batch_out");
+    let mock_bin = mock_ffmpeg_bin();
+
+    let res = Command::new(env!("CARGO_BIN_EXE_foldshift"))
+        .args(["batch", "audio"])
+        .arg(&track1)
+        .arg(&track2)
+        .arg(&track3)
+        .args(["-t", "mp3", "-o"])
+        .arg(&out_dir)
+        .args(["--pattern", "{index:02}_{stem}.{ext}", "--json"])
+        .env("FOLDSHIFT_FFMPEG_PATH", &mock_bin)
+        .output()
+        .unwrap();
+
+    assert!(
+        res.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&res.stderr)
+    );
+    let summary: serde_json::Value = serde_json::from_slice(&res.stdout).unwrap();
+    assert_eq!(summary["total"], 3);
+    assert_eq!(summary["succeeded"], 3);
+    assert_eq!(summary["failed"], 0);
+
+    assert!(out_dir.join("01_track1.mp3").exists());
+    assert!(out_dir.join("02_track2.mp3").exists());
+    assert!(out_dir.join("03_track3.mp3").exists());
+}
+
+#[test]
+fn cli_batch_audio_independent_failures() {
+    let dir = tempfile::tempdir().unwrap();
+    let good1 = dir.path().join("good1.wav");
+    let corrupt = dir.path().join("corrupt.wav");
+    let good2 = dir.path().join("good2.wav");
+
+    std::fs::write(&good1, b"GOOD1").unwrap();
+    std::fs::write(&corrupt, b"CORRUPT").unwrap();
+    std::fs::write(&good2, b"GOOD2").unwrap();
+
+    let out_dir = dir.path().join("audio_batch_fail_out");
+    let mock_bin = mock_ffmpeg_bin();
+
+    let res = Command::new(env!("CARGO_BIN_EXE_foldshift"))
+        .args(["batch", "audio"])
+        .arg(&good1)
+        .arg(&corrupt)
+        .arg(&good2)
+        .args(["-t", "mp3", "-o"])
+        .arg(&out_dir)
+        .env("FOLDSHIFT_FFMPEG_PATH", &mock_bin)
+        .output()
+        .unwrap();
+
+    assert!(!res.status.success());
+    let stdout = String::from_utf8_lossy(&res.stdout);
+    assert!(stdout.contains("Processing good1.wav ... OK"));
+    assert!(stdout.contains("Processing corrupt.wav ... FAILED"));
+    assert!(stdout.contains("Processing good2.wav ... OK"));
+    assert!(stdout.contains("Succeeded:    2"));
+    assert!(stdout.contains("Failed:       1"));
+
+    assert!(out_dir.join("good1.mp3").exists());
+    assert!(!out_dir.join("corrupt.mp3").exists());
+    assert!(out_dir.join("good2.mp3").exists());
 }

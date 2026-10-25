@@ -28,8 +28,11 @@ and a graphical interface are planned. No public release has been published yet.
   place.
 - Expose machine-readable JSON inspection and capability output.
 
-PDF, audio/video, AVIF/HEIC, the desktop UI, engine installation, sandboxing,
-and self-updates are roadmap items, not current features.
+- Inspect and convert audio streams (MP3, WAV, FLAC, OGG, M4A, AAC, WMA, OPUS) via the shared media engine pack (`media`).
+- Inspect, merge, and extract PDF documents via the optional PDF engine pack (`pdf`).
+- Sequential batch processing for images and audio with naming patterns, cancellation, and independent failure isolation.
+
+Video operations, desktop UI, sandboxing, and self-updates are roadmap items.
 
 ## Build profiles and packaging
 
@@ -65,9 +68,15 @@ foldshift convert photo.png photo.jpg --quality 88
 foldshift image resize photo.jpg resized.webp --width 1600 --height 1600
 foldshift image resize photo.jpg resized.jpg --width 1600 --quality 85 --force
 
+# Audio stream operations (requires media engine pack or local ffmpeg)
+foldshift audio inspect track.mp3
+foldshift audio inspect track.mp3 --json
+foldshift audio convert track.wav track.mp3 --bitrate 320k
+
 # Sequential batch processing with naming patterns and progress
 foldshift batch convert img1.png img2.png -t webp -o ./out --pattern "{stem}-optimized.{ext}"
 foldshift batch resize img1.jpg img2.jpg -o ./thumbnails --width 800 --pattern "thumb_{stem}.{ext}"
+foldshift batch audio song1.wav song2.wav -t mp3 -o ./out --pattern "{index:02}_{stem}.{ext}"
 foldshift batch convert img1.png img2.png -t jpg -o ./out --json
 
 # Launch lightweight local browser UI

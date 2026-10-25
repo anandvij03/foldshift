@@ -3,6 +3,7 @@ members = [
     "crates/foldshift-core",
     "crates/foldshift-image",
     "crates/foldshift-pdf",
+    "crates/foldshift-media",
     "crates/foldshift-cli",
     "crates/foldshift-web",
 ]

@@ -16,6 +16,7 @@ axum.workspace = true
 clap.workspace = true
 foldshift-core = { path = "../foldshift-core" }
 foldshift-image = { path = "../foldshift-image" }
+foldshift-media = { path = "../foldshift-media" }
 foldshift-pdf = { path = "../foldshift-pdf" }
 serde.workspace = true
 serde_json.workspace = true

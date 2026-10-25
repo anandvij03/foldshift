@@ -16,6 +16,7 @@ clap.workspace = true
 ctrlc.workspace = true
 foldshift-core = { path = "../foldshift-core" }
 foldshift-image = { path = "../foldshift-image", optional = true }
+foldshift-media = { path = "../foldshift-media" }
 foldshift-pdf = { path = "../foldshift-pdf" }
 serde_json.workspace = true
 

@@ -1,0 +1,21 @@
+[package]
+name = "foldshift-media"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+foldshift-core = { path = "../foldshift-core" }
+serde.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true
+thiserror.workspace = true
+
+[[bin]]
+name = "mock-ffmpeg"
+path = "src/bin/mock_ffmpeg.rs"
+
+[dev-dependencies]
+tempfile.workspace = true

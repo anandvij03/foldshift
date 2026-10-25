@@ -18,9 +18,12 @@ pub const INDEX_HTML: &str = include_str!("index.html");
 pub struct SystemStatus {
     pub version: &'static str,
     pub supported_extensions: &'static [&'static str],
+    pub supported_audio_extensions: &'static [&'static str],
     pub capabilities: Vec<foldshift_core::OperationInfo>,
     pub pdf_available: bool,
     pub pdf_source: Option<String>,
+    pub media_available: bool,
+    pub media_source: Option<String>,
 }
 
 pub fn app() -> Router {
@@ -34,6 +37,8 @@ pub fn app() -> Router {
         .route("/api/resize", post(api_resize))
         .route("/api/pdf/merge", post(api_pdf_merge))
         .route("/api/pdf/extract", post(api_pdf_extract))
+        .route("/api/audio/inspect", post(api_audio_inspect))
+        .route("/api/audio/convert", post(api_audio_convert))
         .layer(DefaultBodyLimit::max(100 * 102_400)) // 100 MB limit
 }
 
@@ -92,10 +97,25 @@ async fn api_capabilities() -> Json<SystemStatus> {
         }
         Err(_) => (false, None),
     };
-    let is_media_available = foldshift_core::pack::is_capability_installed("media");
+    let (is_media_available, media_source) = match foldshift_media::resolve_media_engine() {
+        Ok(path) => {
+            let src = if foldshift_core::pack::is_capability_installed("media") {
+                "Pack"
+            } else if std::env::var("FOLDSHIFT_FFMPEG_PATH").is_ok() {
+                "Environment variable (FOLDSHIFT_FFMPEG_PATH)"
+            } else if std::env::var("FOLDSHIFT_MEDIA_PATH").is_ok() {
+                "Environment variable (FOLDSHIFT_MEDIA_PATH)"
+            } else {
+                "System PATH"
+            };
+            (true, Some(format!("{} ({})", src, path.display())))
+        }
+        Err(_) => (false, None),
+    };
     Json(SystemStatus {
         version: "0.1.0",
         supported_extensions: foldshift_image::SUPPORTED_EXTENSIONS,
+        supported_audio_extensions: foldshift_media::SUPPORTED_AUDIO_EXTENSIONS,
         capabilities: foldshift_core::operations_with(|cap| match cap {
             "image" => true,
             "pdf" => is_pdf_available,
@@ -104,6 +124,8 @@ async fn api_capabilities() -> Json<SystemStatus> {
         }),
         pdf_available: is_pdf_available,
         pdf_source,
+        media_available: is_media_available,
+        media_source,
     })
 }
 
@@ -246,6 +268,16 @@ async fn api_inspect(
 
     let inspection = if ext.eq_ignore_ascii_case("pdf") {
         foldshift_pdf::inspect(temp_file.path()).map_err(|e| {
+            let status = match e {
+                foldshift_core::FcError::CapabilityUnavailable(_) => {
+                    StatusCode::SERVICE_UNAVAILABLE
+                }
+                _ => StatusCode::UNPROCESSABLE_ENTITY,
+            };
+            (status, Json(json!({ "error": e.to_string() })))
+        })?
+    } else if foldshift_media::is_supported_audio_extension(ext) {
+        foldshift_media::inspect(temp_file.path()).map_err(|e| {
             let status = match e {
                 foldshift_core::FcError::CapabilityUnavailable(_) => {
                     StatusCode::SERVICE_UNAVAILABLE
@@ -721,6 +753,224 @@ async fn api_pdf_extract(
     response.headers_mut().insert(
         header::CONTENT_TYPE,
         HeaderValue::from_static("application/pdf"),
+    );
+    response.headers_mut().insert(
+        header::CONTENT_DISPOSITION,
+        HeaderValue::from_str(&format!("attachment; filename=\"{}\"", download_name)).unwrap(),
+    );
+
+    Ok(response)
+}
+
+async fn api_audio_inspect(
+    mut multipart: Multipart,
+) -> Result<Json<foldshift_core::Inspection>, (StatusCode, Json<serde_json::Value>)> {
+    let mut file_bytes: Option<(String, Vec<u8>)> = None;
+
+    while let Ok(Some(field)) = multipart.next_field().await {
+        let name = field.name().unwrap_or_default().to_string();
+        if name == "file" {
+            let filename = field.file_name().unwrap_or("unnamed.mp3").to_string();
+            let bytes = field.bytes().await.map_err(|e| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({ "error": format!("Failed reading file bytes: {}", e) })),
+                )
+            })?;
+            file_bytes = Some((filename, bytes.to_vec()));
+            break;
+        }
+    }
+
+    let (filename, bytes) = file_bytes.ok_or_else(|| {
+        (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "No file field uploaded" })),
+        )
+    })?;
+
+    let ext = Path::new(&filename)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("mp3");
+
+    let temp_file = tempfile::Builder::new()
+        .suffix(&format!(".{}", ext))
+        .tempfile()
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?;
+
+    std::fs::write(temp_file.path(), &bytes).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    let inspection = foldshift_media::inspect(temp_file.path()).map_err(|e| {
+        let status = match e {
+            foldshift_core::FcError::CapabilityUnavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
+            _ => StatusCode::UNPROCESSABLE_ENTITY,
+        };
+        (status, Json(json!({ "error": e.to_string() })))
+    })?;
+
+    let mut modified = inspection;
+    modified.path = PathBuf::from(filename);
+
+    Ok(Json(modified))
+}
+
+async fn api_audio_convert(
+    mut multipart: Multipart,
+) -> Result<Response, (StatusCode, Json<serde_json::Value>)> {
+    let mut file_data: Option<(String, Vec<u8>)> = None;
+    let mut target_format = String::from("mp3");
+    let mut bitrate: Option<String> = None;
+    let mut sample_rate: Option<u32> = None;
+    let mut channels: Option<u8> = None;
+    let force = true;
+
+    while let Ok(Some(field)) = multipart.next_field().await {
+        let name = field.name().unwrap_or_default().to_string();
+        match name.as_str() {
+            "file" => {
+                let filename = field.file_name().unwrap_or("input.mp3").to_string();
+                let bytes = field.bytes().await.map_err(|e| {
+                    (
+                        StatusCode::BAD_REQUEST,
+                        Json(json!({ "error": format!("Upload error: {}", e) })),
+                    )
+                })?;
+                file_data = Some((filename, bytes.to_vec()));
+            }
+            "format" | "to" => {
+                if let Ok(text) = field.text().await {
+                    let trimmed = text.trim().to_lowercase();
+                    if !trimmed.is_empty() {
+                        target_format = trimmed;
+                    }
+                }
+            }
+            "bitrate" => {
+                if let Ok(text) = field.text().await {
+                    let trimmed = text.trim().to_lowercase();
+                    if !trimmed.is_empty() {
+                        bitrate = Some(trimmed);
+                    }
+                }
+            }
+            "sample_rate" => {
+                if let Some(val) = field
+                    .text()
+                    .await
+                    .ok()
+                    .and_then(|t| t.trim().parse::<u32>().ok())
+                    .filter(|&v| v > 0)
+                {
+                    sample_rate = Some(val);
+                }
+            }
+            "channels" => {
+                if let Some(val) = field
+                    .text()
+                    .await
+                    .ok()
+                    .and_then(|t| t.trim().parse::<u8>().ok())
+                    .filter(|&v| v > 0)
+                {
+                    channels = Some(val);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let (filename, bytes) = file_data.ok_or_else(|| {
+        (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "No file uploaded" })),
+        )
+    })?;
+
+    let in_ext = Path::new(&filename)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("mp3");
+
+    let temp_input = tempfile::Builder::new()
+        .suffix(&format!(".{}", in_ext))
+        .tempfile()
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?;
+
+    std::fs::write(temp_input.path(), &bytes).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    let temp_dir = tempfile::tempdir().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+    })?;
+    let output_path = temp_dir.path().join(format!("output.{}", target_format));
+
+    let options = foldshift_media::AudioConvertOptions {
+        bitrate,
+        sample_rate,
+        channels,
+        force,
+    };
+
+    foldshift_media::convert(temp_input.path(), &output_path, options).map_err(|e| {
+        let status = match e {
+            foldshift_core::FcError::CapabilityUnavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
+            _ => StatusCode::UNPROCESSABLE_ENTITY,
+        };
+        (status, Json(json!({ "error": e.to_string() })))
+    })?;
+
+    let out_bytes = std::fs::read(&output_path).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    let stem = Path::new(&filename)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("output");
+    let download_name = format!("{}.{}", stem, target_format);
+
+    let mime_type = match target_format.as_str() {
+        "mp3" => "audio/mpeg",
+        "wav" => "audio/wav",
+        "flac" => "audio/flac",
+        "ogg" => "audio/ogg",
+        "m4a" => "audio/mp4",
+        "aac" => "audio/aac",
+        "opus" => "audio/opus",
+        "wma" => "audio/x-ms-wma",
+        _ => "application/octet-stream",
+    };
+
+    let mut response = out_bytes.into_response();
+    response.headers_mut().insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_str(mime_type).unwrap(),
     );
     response.headers_mut().insert(
         header::CONTENT_DISPOSITION,

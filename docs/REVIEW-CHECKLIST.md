@@ -112,4 +112,29 @@ Reviewed commits: `72e4186` (FS-030 core batch), `41c8612` (web & installers)
 4. **Dependency Minimality**:
    - **Verified**: Core-only profile has 0 image codecs. `ctrlc` added solely to CLI for cross-platform signal management without impacting core libraries.
 
+---
+
+## Milestone 4 Review & Audit (FS-031)
+
+Audit date: 25 October 2026  
+Reviewed commits: `feat/fs-031-audio-adapter-media-pack`  
+
+### Findings and Dispositions
+
+1. **Audio Subprocess Adapter & Deadlock Prevention**:
+   - **Verified**: `run_media_engine` uses concurrent background worker threads to drain `stdout` and `stderr` simultaneously, preventing pipe buffer deadlocks across Windows, Linux, and macOS.
+   - **Verified**: 10 MB maximum output buffer cap (`MAX_OUTPUT_BYTES`) and 60-second execution deadline prevent runaway processes and output bombs. Closed `stdin` (`Stdio::null()`) prevents interactive hangs.
+
+2. **Shared Media Pack Architecture**:
+   - **Verified**: Audio adapter utilizes the unified `"media"` engine pack (`ffmpeg`). Audio and video share this single pack archive, preventing duplicate downloads or redundant binary storage.
+   - **Verified**: Engine discovery follows strict priority: `FOLDSHIFT_FFMPEG_PATH` -> `FOLDSHIFT_MEDIA_PATH` -> installed `"media"` pack -> system `PATH`.
+
+3. **Safe Publication & Same-File Policies**:
+   - **Verified**: Atomic publication via `tempfile::Builder::new().tempfile_in(output_parent)` guarantees that outputs are staged in the same directory as the target, enabling true atomic moves (`persist_noclobber` / `persist`).
+   - **Verified**: Same-file policy ensures attempting to overwrite the input without `--force` fails safely, preserving original audio content intact.
+
+4. **Dependency Minimality**:
+   - **Verified**: `foldshift-media` does not link native ffmpeg libraries into Rust, keeping the Rust executable 100% free of media codecs.
+   - **Verified**: Core-only profile retains 0 image or media codecs, passing `tools/verify_dependencies.ps1`.
+
 

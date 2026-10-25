@@ -138,8 +138,21 @@ pub fn operations_with(mut is_available: impl FnMut(&str) -> bool) -> Vec<Operat
             available: is_available("pdf"),
         },
         OperationInfo {
+            id: "audio.inspect".into(),
+            summary: "Inspect audio stream metadata and format".into(),
+            capability: "media".into(),
+            available: is_available("media"),
+        },
+        OperationInfo {
             id: "audio.convert".into(),
             summary: "Convert an audio stream".into(),
+            capability: "media".into(),
+            available: is_available("media"),
+        },
+        OperationInfo {
+            id: "batch.audio".into(),
+            summary: "Batch convert multiple audio files sequentially with progress reporting"
+                .into(),
             capability: "media".into(),
             available: is_available("media"),
         },

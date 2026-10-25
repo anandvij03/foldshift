@@ -368,3 +368,94 @@ async fn test_api_capabilities_dynamic_pdf_detection() {
 
     unsafe { std::env::remove_var("FOLDSHIFT_QPDF_PATH") };
 }
+
+fn mock_ffmpeg_bin() -> std::path::PathBuf {
+    let mut path = std::env::current_exe().unwrap();
+    path.pop();
+    if path.ends_with("deps") {
+        path.pop();
+    }
+    path.join(if cfg!(windows) {
+        "mock-ffmpeg.exe"
+    } else {
+        "mock-ffmpeg"
+    })
+}
+
+#[tokio::test]
+async fn test_api_capabilities_dynamic_media_detection() {
+    let _guard = ENV_LOCK.lock().await;
+    let mock_path = mock_ffmpeg_bin();
+    unsafe { std::env::set_var("FOLDSHIFT_FFMPEG_PATH", &mock_path) };
+
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    tokio::spawn(async move {
+        axum::serve(listener, foldshift_web::app()).await.unwrap();
+    });
+
+    let (head, body) =
+        send_request(addr, "GET", "/api/capabilities", "application/json", b"").await;
+    assert!(head.starts_with("HTTP/1.1 200 OK"));
+    let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(json["media_available"], true);
+    assert!(
+        json["media_source"]
+            .as_str()
+            .unwrap()
+            .contains("FOLDSHIFT_FFMPEG_PATH")
+    );
+
+    unsafe { std::env::remove_var("FOLDSHIFT_FFMPEG_PATH") };
+}
+
+#[tokio::test]
+async fn test_api_audio_endpoints() {
+    let _guard = ENV_LOCK.lock().await;
+    let mock_path = mock_ffmpeg_bin();
+    unsafe { std::env::set_var("FOLDSHIFT_FFMPEG_PATH", &mock_path) };
+
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    tokio::spawn(async move {
+        axum::serve(listener, foldshift_web::app()).await.unwrap();
+    });
+
+    let boundary = "BOUNDARYAUDIO";
+    let ct = format!("multipart/form-data; boundary={}", boundary);
+
+    // 1. POST /api/audio/inspect
+    let audio_data = b"MOCK_AUDIO_DATA_FOR_TEST";
+    let inspect_body = build_multipart(boundary, Some(("file", "test_track.mp3", audio_data)), &[]);
+    let (head_insp, body_insp) =
+        send_request(addr, "POST", "/api/audio/inspect", &ct, &inspect_body).await;
+    assert!(
+        head_insp.starts_with("HTTP/1.1 200 OK"),
+        "Expected 200 OK, got: {}",
+        head_insp
+    );
+    let insp_json: serde_json::Value = serde_json::from_slice(&body_insp).unwrap();
+    assert_eq!(insp_json["format"], "MP3");
+    assert_eq!(insp_json["properties"]["duration"], "00:03:15.50");
+
+    // 2. POST /api/audio/convert
+    let convert_body = build_multipart(
+        boundary,
+        Some(("file", "track.wav", audio_data)),
+        &[("format", "mp3"), ("bitrate", "320k")],
+    );
+    let (head_conv, body_conv) =
+        send_request(addr, "POST", "/api/audio/convert", &ct, &convert_body).await;
+    assert!(
+        head_conv.starts_with("HTTP/1.1 200 OK"),
+        "Expected 200 OK, got: {}",
+        head_conv
+    );
+    assert!(head_conv.contains("audio/mpeg"));
+    assert!(head_conv.contains("track.mp3"));
+    assert!(!body_conv.is_empty());
+
+    unsafe { std::env::remove_var("FOLDSHIFT_FFMPEG_PATH") };
+}

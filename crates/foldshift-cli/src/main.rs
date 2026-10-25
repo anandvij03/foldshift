@@ -1,9 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-#[cfg(feature = "image")]
-use clap::Args;
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 #[cfg(feature = "image")]
 use foldshift_image::EncodeOptions;
 
@@ -36,6 +34,11 @@ enum Command {
         #[command(subcommand)]
         command: PdfCommand,
     },
+    /// Audio-specific operations.
+    Audio {
+        #[command(subcommand)]
+        command: AudioCommand,
+    },
     /// Inspect a supported local file.
     #[cfg(feature = "image")]
     Inspect {
@@ -54,7 +57,6 @@ enum Command {
         command: ImageCommand,
     },
     /// Batch operations for processing multiple files sequentially.
-    #[cfg(feature = "image")]
     Batch {
         #[command(subcommand)]
         command: BatchCommand,
@@ -136,6 +138,37 @@ enum PdfCommand {
     },
 }
 
+#[derive(Debug, Subcommand)]
+enum AudioCommand {
+    /// Inspect an audio file's duration, bitrate, sample rate, channels, and codec.
+    Inspect {
+        file: PathBuf,
+        /// Emit machine-readable JSON.
+        #[arg(long)]
+        json: bool,
+    },
+    /// Convert an audio file to a target format.
+    Convert(AudioConvertArgs),
+}
+
+#[derive(Debug, Args)]
+struct AudioConvertArgs {
+    input: PathBuf,
+    output: PathBuf,
+    /// Target audio bitrate (e.g. "128k", "192k", "320k").
+    #[arg(long)]
+    bitrate: Option<String>,
+    /// Target audio sample rate in Hz (e.g. 44100, 48000).
+    #[arg(long)]
+    sample_rate: Option<u32>,
+    /// Target channels count (1 for mono, 2 for stereo).
+    #[arg(long)]
+    channels: Option<u8>,
+    /// Replace an existing output file.
+    #[arg(long)]
+    force: bool,
+}
+
 #[cfg(feature = "image")]
 #[derive(Debug, Subcommand)]
 enum ImageCommand {
@@ -175,13 +208,47 @@ struct ResizeArgs {
     force: bool,
 }
 
-#[cfg(feature = "image")]
 #[derive(Debug, Subcommand)]
 enum BatchCommand {
     /// Convert multiple images sequentially with progress reporting.
+    #[cfg(feature = "image")]
     Convert(BatchConvertArgs),
     /// Resize multiple images sequentially with progress reporting.
+    #[cfg(feature = "image")]
     Resize(BatchResizeArgs),
+    /// Convert multiple audio files sequentially with progress reporting.
+    Audio(BatchAudioArgs),
+}
+
+#[derive(Debug, Args)]
+struct BatchAudioArgs {
+    /// Input audio files to convert.
+    #[arg(required = true, num_args = 1..)]
+    inputs: Vec<PathBuf>,
+    /// Destination audio format / extension (e.g. 'mp3', 'wav', 'flac', 'ogg', 'm4a', 'aac', 'opus').
+    #[arg(long, short = 't')]
+    to: String,
+    /// Directory where converted files will be saved.
+    #[arg(long, short = 'o')]
+    out_dir: PathBuf,
+    /// Naming pattern for output files (e.g. '{stem}.{ext}', '{stem}-converted.{ext}', '{index:03}_{stem}.{ext}').
+    #[arg(long)]
+    pattern: Option<String>,
+    /// Target audio bitrate (e.g. "128k", "192k", "320k").
+    #[arg(long)]
+    bitrate: Option<String>,
+    /// Target audio sample rate in Hz (e.g. 44100, 48000).
+    #[arg(long)]
+    sample_rate: Option<u32>,
+    /// Target channels count (1 for mono, 2 for stereo).
+    #[arg(long)]
+    channels: Option<u8>,
+    /// Overwrite existing output files.
+    #[arg(long)]
+    force: bool,
+    /// Emit machine-readable JSON summary upon completion.
+    #[arg(long)]
+    json: bool,
 }
 
 #[cfg(feature = "image")]
@@ -281,6 +348,10 @@ fn run() -> Result<()> {
                 force,
             } => pdf_extract(input, output, pages, force)?,
         },
+        Command::Audio { command } => match command {
+            AudioCommand::Inspect { file, json } => audio_inspect(file, json)?,
+            AudioCommand::Convert(args) => audio_convert(args)?,
+        },
         #[cfg(feature = "image")]
         Command::Inspect { file, json } => inspect(file, json)?,
         #[cfg(feature = "image")]
@@ -292,10 +363,12 @@ fn run() -> Result<()> {
         Command::Image {
             command: ImageCommand::Resize(args),
         } => resize(args)?,
-        #[cfg(feature = "image")]
         Command::Batch { command } => match command {
+            #[cfg(feature = "image")]
             BatchCommand::Convert(args) => batch_convert_cmd(args)?,
+            #[cfg(feature = "image")]
             BatchCommand::Resize(args) => batch_resize_cmd(args)?,
+            BatchCommand::Audio(args) => batch_audio_cmd(args)?,
         },
     }
     Ok(())
@@ -304,7 +377,8 @@ fn run() -> Result<()> {
 fn capabilities(json: bool) -> Result<()> {
     let is_image_available = cfg!(feature = "image");
     let is_pdf_available = foldshift_core::pack::is_capability_installed("pdf");
-    let is_media_available = foldshift_core::pack::is_capability_installed("media");
+    let is_media_available = foldshift_core::pack::is_capability_installed("media")
+        || foldshift_media::resolve_media_engine().is_ok();
     let operations = foldshift_core::operations_with(|cap| match cap {
         "image" => is_image_available,
         "pdf" => is_pdf_available,
@@ -336,8 +410,14 @@ fn capabilities(json: bool) -> Result<()> {
             "MEDIA  installed ({} v{})",
             media_pack.name, media_pack.version
         );
+    } else if let Ok(engine) = foldshift_media::resolve_media_engine() {
+        let display = engine
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("ffmpeg");
+        println!("MEDIA  installed (system/env: {})", display);
     } else {
-        println!("MEDIA  not installed (planned)");
+        println!("MEDIA  not installed (run 'foldshift packs list')");
     }
 
     println!();
@@ -647,7 +727,63 @@ fn batch_resize_cmd(args: BatchResizeArgs) -> Result<()> {
     Ok(())
 }
 
-#[cfg(feature = "image")]
+fn batch_audio_cmd(args: BatchAudioArgs) -> Result<()> {
+    let cancel_token = foldshift_core::batch::CancellationToken::new();
+    let handler_token = cancel_token.clone();
+    let interrupt_count = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let interrupt_clone = interrupt_count.clone();
+
+    let _ = ctrlc::set_handler(move || {
+        let prev = interrupt_clone.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        if prev == 0 {
+            eprintln!(
+                "\nCancellation requested (Ctrl+C). Safely stopping batch after current item..."
+            );
+            handler_token.cancel();
+        } else {
+            eprintln!("\nSecond interrupt received. Terminating immediately.");
+            std::process::exit(130);
+        }
+    });
+
+    let json_mode = args.json;
+    let summary = foldshift_media::batch_convert(
+        &args.inputs,
+        &args.to,
+        &args.out_dir,
+        args.pattern.as_deref(),
+        foldshift_media::AudioConvertOptions {
+            bitrate: args.bitrate,
+            sample_rate: args.sample_rate,
+            channels: args.channels,
+            force: args.force,
+        },
+        &cancel_token,
+        |ev| {
+            if !json_mode {
+                render_batch_progress(&ev);
+            }
+        },
+    )?;
+
+    if json_mode {
+        println!("{}", serde_json::to_string_pretty(&summary)?);
+    } else {
+        render_batch_summary(&summary);
+    }
+
+    if summary.has_failures_or_cancellations() {
+        anyhow::bail!(
+            "Batch completed with issues: {} succeeded, {} failed, {} cancelled",
+            summary.succeeded,
+            summary.failed,
+            summary.cancelled
+        );
+    }
+
+    Ok(())
+}
+
 fn render_batch_progress(ev: &foldshift_core::batch::BatchProgress<'_>) {
     use foldshift_core::batch::{BatchProgress, ItemStatus};
     match ev {
@@ -692,7 +828,6 @@ fn render_batch_progress(ev: &foldshift_core::batch::BatchProgress<'_>) {
     }
 }
 
-#[cfg(feature = "image")]
 fn render_batch_summary(summary: &foldshift_core::batch::BatchSummary) {
     println!("\n====================================================");
     println!("  Batch Execution Summary");
@@ -740,6 +875,40 @@ fn pdf_extract(input: PathBuf, output: PathBuf, pages: String, force: bool) -> R
         pages,
         input.display(),
         output.display()
+    );
+    Ok(())
+}
+
+fn audio_inspect(file: PathBuf, json_output: bool) -> Result<()> {
+    let inspection = foldshift_media::inspect(&file)?;
+    if json_output {
+        println!("{}", serde_json::to_string_pretty(&inspection)?);
+    } else {
+        println!("File    {}", inspection.path.display());
+        println!("Type    {}", inspection.format);
+        println!("Size    {} bytes", inspection.bytes);
+        for (key, value) in inspection.properties {
+            println!("{:<14}{}", title_case(&key), plain_json(value));
+        }
+    }
+    Ok(())
+}
+
+fn audio_convert(args: AudioConvertArgs) -> Result<()> {
+    foldshift_media::convert(
+        &args.input,
+        &args.output,
+        foldshift_media::AudioConvertOptions {
+            bitrate: args.bitrate,
+            sample_rate: args.sample_rate,
+            channels: args.channels,
+            force: args.force,
+        },
+    )?;
+    println!(
+        "Converted {} -> {}",
+        args.input.display(),
+        args.output.display()
     );
     Ok(())
 }
