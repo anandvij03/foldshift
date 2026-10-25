@@ -1013,6 +1013,10 @@
         <span>Audio Studio</span>
         <span class="domain-tag">8 Formats</span>
       </button>
+      <button class="domain-btn" data-domain="domain-video">
+        <span>Video Studio</span>
+        <span class="domain-tag">Transcode &bull; Scale</span>
+      </button>
       <button class="domain-btn" data-domain="domain-pdfs">
         <span>PDF Studio</span>
         <span class="domain-tag">Merge &bull; Extract</span>
@@ -1310,6 +1314,198 @@
             <div class="spec-grid" id="audio-inspect-specs"></div>
           </div>
           <div class="msg-box" id="audio-inspect-msg"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- DOMAIN: VIDEO STUDIO                                         -->
+    <!-- ============================================================ -->
+    <div class="domain-panel" id="domain-video">
+      <!-- Engine Active Banner -->
+      <div class="engine-active-banner" id="video-engine-active-banner">
+        <div class="engine-active-left">
+          <span class="engine-active-title"><span class="pulse-dot"></span> Media Engine Active (ffmpeg)</span>
+          <span class="engine-active-meta" id="video-engine-source-label">Local process</span>
+        </div>
+        <div>
+          <button type="button" class="btn-clear" id="btn-toggle-video-pack-installer" style="font-size: 11px;">Pack Manager &darr;</button>
+        </div>
+      </div>
+
+      <!-- Engine Setup Card -->
+      <div class="engine-setup-card" id="video-engine-setup-card">
+        <div class="engine-setup-header">
+          <div class="engine-setup-title">
+            <span style="color: var(--warning);">&#9888;</span>
+            <span>Media Engine Setup Required</span>
+          </div>
+          <span class="badge-warning">Missing Engine</span>
+        </div>
+        <div class="engine-setup-desc">
+          FoldShift transcodes video streams, resizes resolution, adjusts framerates, and inspects video metadata 100% locally via <code>ffmpeg</code>. No files ever leave your device.
+        </div>
+        <div class="engine-setup-grid">
+          <div class="setup-box">
+            <div class="setup-box-title">
+              <span>Option 1 &bull; Drop Capability Pack</span>
+              <span class="domain-tag">Offline .zip</span>
+            </div>
+            <div class="dropzone" id="video-pack-dropzone" style="padding: 18px 12px; margin-bottom: 8px;">
+              <input type="file" id="video-pack-input" accept=".zip,application/zip">
+              <div class="dropzone-icon">&boxbox;</div>
+              <div class="dropzone-title">Drop <code>foldshift-pack-media-*.zip</code> here</div>
+              <div class="dropzone-hint">Local unpack & verification</div>
+            </div>
+            <div class="msg-box" id="video-pack-msg" style="margin-top: 4px;"></div>
+          </div>
+          <div class="setup-box">
+            <div class="setup-box-title">
+              <span>Option 2 &bull; System Package</span>
+              <span class="domain-tag">Package Manager</span>
+            </div>
+            <div class="cmd-list">
+              <div class="cmd-row">
+                <span class="cmd-label">Windows</span>
+                <span class="cmd-code">winget install Gyan.FFmpeg</span>
+                <button type="button" class="btn-copy" data-cmd="winget install Gyan.FFmpeg">Copy</button>
+              </div>
+              <div class="cmd-row">
+                <span class="cmd-label">macOS</span>
+                <span class="cmd-code">brew install ffmpeg</span>
+                <button type="button" class="btn-copy" data-cmd="brew install ffmpeg">Copy</button>
+              </div>
+              <div class="cmd-row">
+                <span class="cmd-label">Linux</span>
+                <span class="cmd-code">sudo apt install ffmpeg</span>
+                <button type="button" class="btn-copy" data-cmd="sudo apt install ffmpeg">Copy</button>
+              </div>
+            </div>
+            <button type="button" class="btn-recheck" id="btn-recheck-video-engine">
+              <span>&#8635;</span> <span>Re-check Engine</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Video Upload Dropzone & Selected Bar -->
+      <div id="video-upload-section">
+        <div class="dropzone" id="video-dropzone">
+          <input type="file" id="video-file-input" accept="video/*,.mp4,.webm,.mkv,.avi,.mov,.flv,.wmv,.m4v">
+          <div class="dropzone-icon">&boxbox;</div>
+          <div class="dropzone-title">Drop a video file here or click to choose</div>
+          <div class="dropzone-hint">Supported: MP4, WebM, MKV, MOV, AVI, FLV, WMV, M4V (Max 100MB)</div>
+        </div>
+
+        <div class="file-bar" id="video-file-bar">
+          <div class="file-info">
+            <div class="file-thumb" id="video-preview">&#127916;</div>
+            <div class="file-meta">
+              <div class="file-name" id="video-file-name">video.mp4</div>
+              <div class="file-specs" id="video-file-specs">0 KB</div>
+            </div>
+          </div>
+          <button class="btn-clear" id="video-btn-clear" type="button">Remove</button>
+        </div>
+      </div>
+
+      <!-- Video Subnav -->
+      <div class="subnav">
+        <button class="subnav-btn active" data-sub="video-sub-transcode">Transcode & Scale</button>
+        <button class="subnav-btn" data-sub="video-sub-inspect">Inspect</button>
+        <button class="subnav-btn" data-sub="video-sub-extract">Extract Audio</button>
+      </div>
+
+      <!-- Video Transcode Subpanel -->
+      <div class="sub-panel active" id="video-sub-transcode">
+        <div class="card">
+          <div class="form-group">
+            <label class="form-label">Target Format</label>
+            <div class="format-grid" id="video-convert-formats">
+              <button type="button" class="format-btn active" data-fmt="mp4">MP4 (H.264)</button>
+              <button type="button" class="format-btn" data-fmt="webm">WebM (VP9)</button>
+              <button type="button" class="format-btn" data-fmt="mkv">MKV</button>
+              <button type="button" class="format-btn" data-fmt="mov">MOV</button>
+              <button type="button" class="format-btn" data-fmt="avi">AVI</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Resolution & Proportional Scaling</label>
+            <div class="format-grid" id="video-resolution-options">
+              <button type="button" class="format-btn active" data-res="">Keep original</button>
+              <button type="button" class="format-btn" data-res="1920:1080">1080p (1920&times;1080)</button>
+              <button type="button" class="format-btn" data-res="1280:720">720p (1280&times;720)</button>
+              <button type="button" class="format-btn" data-res="854:480">480p (854&times;480)</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Framerate (FPS)</label>
+            <div class="format-grid" id="video-fps-options">
+              <button type="button" class="format-btn active" data-fps="">Keep original</button>
+              <button type="button" class="format-btn" data-fps="24">24 fps (Film)</button>
+              <button type="button" class="format-btn" data-fps="30">30 fps (Standard)</button>
+              <button type="button" class="format-btn" data-fps="60">60 fps (Smooth)</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Quality (CRF)</label>
+            <div class="format-grid" id="video-crf-options">
+              <button type="button" class="format-btn" data-crf="18">High Quality (CRF 18)</button>
+              <button type="button" class="format-btn active" data-crf="23">Balanced (CRF 23)</button>
+              <button type="button" class="format-btn" data-crf="28">Small Size (CRF 28)</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Audio Stream</label>
+            <div class="format-grid" id="video-audio-options">
+              <button type="button" class="format-btn active" data-mute="false">Preserve Audio</button>
+              <button type="button" class="format-btn" data-mute="true">Mute / Strip Audio (-an)</button>
+            </div>
+          </div>
+
+          <button class="btn-action" id="btn-video-transcode-run" disabled>
+            <span>Transcode & Download</span>
+          </button>
+          <div class="msg-box" id="video-transcode-msg"></div>
+        </div>
+      </div>
+
+      <!-- Video Inspect Subpanel -->
+      <div class="sub-panel" id="video-sub-inspect">
+        <div class="card">
+          <div id="video-inspect-empty" style="text-align: center; color: var(--text-muted); padding: 24px 0;">
+            Select a video file above to inspect duration, bitrate, resolution, fps, and codecs.
+          </div>
+          <div id="video-inspect-result" style="display: none;">
+            <div style="font-weight: 600; font-size: 13px; margin-bottom: 8px;">Video Stream Inspection Report</div>
+            <div class="spec-grid" id="video-inspect-specs"></div>
+          </div>
+          <div class="msg-box" id="video-inspect-msg"></div>
+        </div>
+      </div>
+
+      <!-- Extract Audio Subpanel -->
+      <div class="sub-panel" id="video-sub-extract">
+        <div class="card">
+          <div class="form-group">
+            <label class="form-label">Target Audio Format</label>
+            <div class="format-grid" id="video-extract-formats">
+              <button type="button" class="format-btn active" data-fmt="mp3">MP3</button>
+              <button type="button" class="format-btn" data-fmt="wav">WAV</button>
+              <button type="button" class="format-btn" data-fmt="flac">FLAC</button>
+              <button type="button" class="format-btn" data-fmt="aac">AAC</button>
+              <button type="button" class="format-btn" data-fmt="opus">OPUS</button>
+            </div>
+          </div>
+
+          <button class="btn-action" id="btn-video-extract-run" disabled>
+            <span>Extract Soundtrack</span>
+          </button>
+          <div class="msg-box" id="video-extract-msg"></div>
         </div>
       </div>
     </div>
@@ -1617,6 +1813,7 @@
 
     setupSubnav('#domain-images');
     setupSubnav('#domain-audio');
+    setupSubnav('#domain-video');
     setupSubnav('#domain-pdfs');
 
     // ============================================================
@@ -2102,6 +2299,313 @@
     }
 
     // ============================================================
+    // VIDEO STUDIO LOGIC
+    // ============================================================
+    let currentVideoFile = null;
+    let selectedVideoFormat = 'mp4';
+    let selectedVideoRes = '';
+    let selectedVideoFps = '';
+    let selectedVideoCrf = '23';
+    let selectedVideoMute = 'false';
+    let selectedVideoExtractFormat = 'mp3';
+
+    const videoDropzone = document.getElementById('video-dropzone');
+    const videoFileInput = document.getElementById('video-file-input');
+    const videoFileBar = document.getElementById('video-file-bar');
+    const videoFileName = document.getElementById('video-file-name');
+    const videoFileSpecs = document.getElementById('video-file-specs');
+    const videoBtnClear = document.getElementById('video-btn-clear');
+
+    function handleSelectedVideo(file) {
+      if (!file) return;
+      currentVideoFile = file;
+
+      videoFileName.textContent = file.name;
+      videoFileSpecs.textContent = formatBytes(file.size);
+
+      videoDropzone.style.display = 'none';
+      videoFileBar.style.display = 'flex';
+
+      const btnRun = document.getElementById('btn-video-transcode-run');
+      if (btnRun) btnRun.disabled = false;
+      const btnExtract = document.getElementById('btn-video-extract-run');
+      if (btnExtract) btnExtract.disabled = false;
+
+      inspectVideo(file);
+    }
+
+    function clearVideo() {
+      currentVideoFile = null;
+      if (videoFileInput) videoFileInput.value = '';
+      if (videoDropzone) videoDropzone.style.display = 'block';
+      if (videoFileBar) videoFileBar.style.display = 'none';
+
+      const btnRun = document.getElementById('btn-video-transcode-run');
+      if (btnRun) btnRun.disabled = true;
+      const btnExtract = document.getElementById('btn-video-extract-run');
+      if (btnExtract) btnExtract.disabled = true;
+
+      const inspectRes = document.getElementById('video-inspect-result');
+      if (inspectRes) inspectRes.style.display = 'none';
+      const inspectEmpty = document.getElementById('video-inspect-empty');
+      if (inspectEmpty) inspectEmpty.style.display = 'block';
+
+      hideMsg('video-transcode-msg');
+      hideMsg('video-inspect-msg');
+      hideMsg('video-extract-msg');
+    }
+
+    if (videoFileInput) {
+      videoFileInput.addEventListener('change', e => {
+        if (e.target.files.length) handleSelectedVideo(e.target.files[0]);
+      });
+    }
+    if (videoBtnClear) videoBtnClear.addEventListener('click', clearVideo);
+
+    if (videoDropzone) {
+      ['dragenter', 'dragover'].forEach(name => {
+        videoDropzone.addEventListener(name, e => {
+          e.preventDefault();
+          videoDropzone.classList.add('dragover');
+        });
+      });
+      ['dragleave', 'drop'].forEach(name => {
+        videoDropzone.addEventListener(name, e => {
+          e.preventDefault();
+          videoDropzone.classList.remove('dragover');
+        });
+      });
+      videoDropzone.addEventListener('drop', e => {
+        if (e.dataTransfer.files.length) handleSelectedVideo(e.dataTransfer.files[0]);
+      });
+    }
+
+    // Video Formats
+    document.querySelectorAll('#video-convert-formats .format-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#video-convert-formats .format-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        selectedVideoFormat = btn.dataset.fmt;
+      });
+    });
+
+    // Resolution Options
+    document.querySelectorAll('#video-resolution-options .format-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#video-resolution-options .format-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        selectedVideoRes = btn.dataset.res;
+      });
+    });
+
+    // FPS Options
+    document.querySelectorAll('#video-fps-options .format-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#video-fps-options .format-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        selectedVideoFps = btn.dataset.fps;
+      });
+    });
+
+    // CRF Options
+    document.querySelectorAll('#video-crf-options .format-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#video-crf-options .format-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        selectedVideoCrf = btn.dataset.crf;
+      });
+    });
+
+    // Audio Stream Options
+    document.querySelectorAll('#video-audio-options .format-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#video-audio-options .format-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        selectedVideoMute = btn.dataset.mute;
+      });
+    });
+
+    // Extract Formats
+    document.querySelectorAll('#video-extract-formats .format-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#video-extract-formats .format-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        selectedVideoExtractFormat = btn.dataset.fmt;
+      });
+    });
+
+    // Inspect Video Action
+    async function inspectVideo(file) {
+      hideMsg('video-inspect-msg');
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const res = await fetch('/api/video/inspect', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (!res.ok) {
+          showMsg('video-inspect-msg', 'error', data.error || 'Inspection failed');
+          return;
+        }
+
+        document.getElementById('video-inspect-empty').style.display = 'none';
+        const inspectResult = document.getElementById('video-inspect-result');
+        const specGrid = document.getElementById('video-inspect-specs');
+        specGrid.innerHTML = '';
+
+        const items = [
+          { key: 'Format', val: data.format },
+          { key: 'File Size', val: `${formatBytes(data.bytes)} (${data.bytes.toLocaleString()} bytes)` },
+        ];
+        if (data.properties.duration) items.push({ key: 'Duration', val: data.properties.duration });
+        if (data.properties.bitrate) items.push({ key: 'Bitrate', val: data.properties.bitrate });
+        if (data.properties.resolution) items.push({ key: 'Resolution', val: data.properties.resolution });
+        if (data.properties.fps) items.push({ key: 'Framerate', val: `${data.properties.fps} fps` });
+        if (data.properties.video_codec) items.push({ key: 'Video Codec', val: data.properties.video_codec });
+        if (data.properties.audio_codec) items.push({ key: 'Audio Codec', val: data.properties.audio_codec });
+
+        items.forEach(item => {
+          const div = document.createElement('div');
+          div.className = 'spec-item';
+          div.innerHTML = `<div class="spec-key">${item.key}</div><div class="spec-val">${item.val}</div>`;
+          specGrid.appendChild(div);
+        });
+
+        inspectResult.style.display = 'block';
+      } catch (err) {
+        showMsg('video-inspect-msg', 'error', 'Inspection error: ' + err.message);
+      }
+    }
+
+    // Transcode Video Action
+    const btnVideoTranscode = document.getElementById('btn-video-transcode-run');
+    if (btnVideoTranscode) {
+      btnVideoTranscode.addEventListener('click', async () => {
+        if (!currentVideoFile) return;
+        hideMsg('video-transcode-msg');
+        btnVideoTranscode.disabled = true;
+        btnVideoTranscode.innerHTML = '<span class="spinner"></span> <span>Transcoding video locally...</span>';
+
+        const formData = new FormData();
+        formData.append('file', currentVideoFile);
+        formData.append('format', selectedVideoFormat);
+        if (selectedVideoRes) {
+          const parts = selectedVideoRes.split(':');
+          formData.append('width', parts[0]);
+          formData.append('height', parts[1]);
+        }
+        if (selectedVideoFps) formData.append('fps', selectedVideoFps);
+        if (selectedVideoCrf) formData.append('crf', selectedVideoCrf);
+        if (selectedVideoMute === 'true') formData.append('mute_audio', 'true');
+
+        try {
+          const res = await fetch('/api/video/convert', { method: 'POST', body: formData });
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({ error: 'Video transcode failed' }));
+            showMsg('video-transcode-msg', 'error', errData.error || 'Video transcode failed');
+          } else {
+            const blob = await res.blob();
+            const disp = res.headers.get('content-disposition');
+            let downloadName = 'transcoded.' + selectedVideoFormat;
+            if (disp && disp.includes('filename=')) {
+              const match = disp.match(/filename="?([^"]+)"?/);
+              if (match && match[1]) downloadName = match[1];
+            }
+
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = downloadName;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+
+            showMsg('video-transcode-msg', 'success', `Saved ${downloadName} (${formatBytes(blob.size)})`);
+          }
+        } catch (err) {
+          showMsg('video-transcode-msg', 'error', 'Error: ' + err.message);
+        } finally {
+          btnVideoTranscode.disabled = false;
+          btnVideoTranscode.innerHTML = '<span>Transcode & Download</span>';
+        }
+      });
+    }
+
+    // Extract Audio Action
+    const btnVideoExtract = document.getElementById('btn-video-extract-run');
+    if (btnVideoExtract) {
+      btnVideoExtract.addEventListener('click', async () => {
+        if (!currentVideoFile) return;
+        hideMsg('video-extract-msg');
+        btnVideoExtract.disabled = true;
+        btnVideoExtract.innerHTML = '<span class="spinner"></span> <span>Extracting soundtrack locally...</span>';
+
+        const formData = new FormData();
+        formData.append('file', currentVideoFile);
+        formData.append('format', selectedVideoExtractFormat);
+
+        try {
+          const res = await fetch('/api/video/extract-audio', { method: 'POST', body: formData });
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({ error: 'Audio extraction failed' }));
+            showMsg('video-extract-msg', 'error', errData.error || 'Audio extraction failed');
+          } else {
+            const blob = await res.blob();
+            const disp = res.headers.get('content-disposition');
+            let downloadName = 'soundtrack.' + selectedVideoExtractFormat;
+            if (disp && disp.includes('filename=')) {
+              const match = disp.match(/filename="?([^"]+)"?/);
+              if (match && match[1]) downloadName = match[1];
+            }
+
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = downloadName;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+
+            showMsg('video-extract-msg', 'success', `Saved ${downloadName} (${formatBytes(blob.size)})`);
+          }
+        } catch (err) {
+          showMsg('video-extract-msg', 'error', 'Error: ' + err.message);
+        } finally {
+          btnVideoExtract.disabled = false;
+          btnVideoExtract.innerHTML = '<span>Extract Soundtrack</span>';
+        }
+      });
+    }
+
+    // Pack Installer toggle & recheck for Video
+    const btnToggleVideoPack = document.getElementById('btn-toggle-video-pack-installer');
+    if (btnToggleVideoPack) {
+      btnToggleVideoPack.addEventListener('click', () => {
+        const card = document.getElementById('video-engine-setup-card');
+        if (!card) return;
+        if (card.style.display === 'none' || !card.style.display) {
+          card.style.display = 'block';
+          card.dataset.manuallyOpened = 'true';
+        } else {
+          card.style.display = 'none';
+          card.dataset.manuallyOpened = 'false';
+        }
+      });
+    }
+    const btnRecheckVideo = document.getElementById('btn-recheck-video-engine');
+    if (btnRecheckVideo) {
+      btnRecheckVideo.addEventListener('click', async () => {
+        btnRecheckVideo.disabled = true;
+        btnRecheckVideo.innerHTML = '<span>&#8635;</span> <span>Checking...</span>';
+        await loadCapabilitiesAndPacks();
+        btnRecheckVideo.disabled = false;
+        btnRecheckVideo.innerHTML = '<span>&#8635;</span> <span>Re-check Engine</span>';
+      });
+    }
+
+    // ============================================================
     // PDF STUDIO LOGIC (WITH SIDE-BY-SIDE PREVIEW)
     // ============================================================
     let activePreviewBlobUrl = null;
@@ -2455,6 +2959,7 @@
 
     wirePackDropzone('pdf-pack-dropzone', 'pdf-pack-input', 'pdf-pack-msg');
     wirePackDropzone('media-pack-dropzone', 'media-pack-input', 'media-pack-msg');
+    wirePackDropzone('video-pack-dropzone', 'video-pack-input', 'video-pack-msg');
     wirePackDropzone('system-pack-dropzone', 'system-pack-input', 'system-pack-msg');
 
     // Clipboard Copy Buttons
@@ -2624,10 +3129,13 @@
           }
         }
 
-        // Update Media Engine banners & badges
+        // Update Media Engine banners & badges for Audio & Video
         const audioActiveBanner = document.getElementById('audio-engine-active-banner');
         const audioSetupCardEl = document.getElementById('audio-engine-setup-card');
         const audioSourceLabel = document.getElementById('audio-engine-source-label');
+        const videoActiveBanner = document.getElementById('video-engine-active-banner');
+        const videoSetupCardEl = document.getElementById('video-engine-setup-card');
+        const videoSourceLabel = document.getElementById('video-engine-source-label');
         const badgeMedia = document.getElementById('badge-media');
         const descMedia = document.getElementById('desc-media');
 
@@ -2637,16 +3145,27 @@
             audioSetupCardEl.style.display = 'none';
           }
           if (audioSourceLabel) audioSourceLabel.textContent = mediaSource || 'Local process ready';
+
+          if (videoActiveBanner) videoActiveBanner.style.display = 'flex';
+          if (videoSetupCardEl && videoSetupCardEl.dataset.manuallyOpened !== 'true') {
+            videoSetupCardEl.style.display = 'none';
+          }
+          if (videoSourceLabel) videoSourceLabel.textContent = mediaSource || 'Local process ready';
+
           if (badgeMedia) {
             badgeMedia.className = 'badge-installed';
             badgeMedia.textContent = 'Active';
           }
           if (descMedia) {
-            descMedia.textContent = mediaSource ? `ffmpeg engine active (${mediaSource})` : 'ffmpeg media adapter ready for inspect and convert';
+            descMedia.textContent = mediaSource ? `ffmpeg engine active (${mediaSource})` : 'ffmpeg media adapter ready for audio and video';
           }
         } else {
           if (audioActiveBanner) audioActiveBanner.style.display = 'none';
           if (audioSetupCardEl) audioSetupCardEl.style.display = 'block';
+
+          if (videoActiveBanner) videoActiveBanner.style.display = 'none';
+          if (videoSetupCardEl) videoSetupCardEl.style.display = 'block';
+
           if (badgeMedia) {
             badgeMedia.className = 'badge-planned';
             badgeMedia.textContent = 'Requires Setup';

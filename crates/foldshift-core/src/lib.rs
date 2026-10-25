@@ -156,6 +156,31 @@ pub fn operations_with(mut is_available: impl FnMut(&str) -> bool) -> Vec<Operat
             capability: "media".into(),
             available: is_available("media"),
         },
+        OperationInfo {
+            id: "video.inspect".into(),
+            summary: "Inspect video stream properties, container format, and codecs".into(),
+            capability: "media".into(),
+            available: is_available("media"),
+        },
+        OperationInfo {
+            id: "video.convert".into(),
+            summary: "Convert container, adjust resolution/fps, or transcode a video stream".into(),
+            capability: "media".into(),
+            available: is_available("media"),
+        },
+        OperationInfo {
+            id: "video.extract-audio".into(),
+            summary: "Extract audio stream from a video container".into(),
+            capability: "media".into(),
+            available: is_available("media"),
+        },
+        OperationInfo {
+            id: "batch.video".into(),
+            summary: "Batch convert multiple video files with measured concurrency and progress reporting"
+                .into(),
+            capability: "media".into(),
+            available: is_available("media"),
+        },
     ]
 }
 

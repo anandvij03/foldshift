@@ -137,4 +137,28 @@ Reviewed commits: `feat/fs-031-audio-adapter-media-pack`
    - **Verified**: `foldshift-media` does not link native ffmpeg libraries into Rust, keeping the Rust executable 100% free of media codecs.
    - **Verified**: Core-only profile retains 0 image or media codecs, passing `tools/verify_dependencies.ps1`.
 
+---
+
+## Milestone 4 Review & Audit (FS-032)
+
+Audit date: 25 October 2026  
+Reviewed commits: `feat/fs-032-video-operations-concurrency`  
+
+### Findings and Dispositions
+
+1. **Video Subprocess Adapter & Deadlock Prevention**:
+   - **Verified**: `convert_video`, `extract_audio`, and `inspect` in `foldshift-media` invoke `run_media_engine` with concurrent background worker threads draining `stdout` and `stderr` streams, 10 MB per-stream buffers, and a 60-second execution deadline.
+   - **Verified**: Tempfile staging suffixes (`.suffix(&format!(".{}", target_ext))`) allow FFmpeg to deduce the output container format (e.g. mp4, webm, mkv) during atomic staging without guessing.
+
+2. **Measured Bounded Concurrency (`execute_bounded_batch`)**:
+   - **Verified**: `batch_convert_video` and `batch_convert_audio` utilize `execute_bounded_batch` with user-configurable concurrency (`--concurrency` / `-j`), bounded by `std::thread::available_parallelism()`.
+   - **Verified**: Cooperative `CancellationToken` checks and atomic staging ensure batches stop cleanly on interruption without data corruption or partial files.
+
+3. **Audio Extraction from Video**:
+   - **Verified**: `video.extract-audio` (`foldshift video extract-audio`, `/api/video/extract-audio`) extracts audio with `-vn` into target formats (mp3, wav, flac, aac, opus, ogg) with safe atomic publication and same-file collision protection.
+
+4. **Web UI & REST API Integration**:
+   - **Verified**: Added endpoints `POST /api/video/inspect`, `POST /api/video/convert`, and `POST /api/video/extract-audio` in `foldshift-web`.
+   - **Verified**: Added interactive Video Studio in `index.html` with format grids, resolution presets (1080p, 720p, 480p), framerate controls (24, 30, 60 fps), CRF visual quality settings, audio stripping, and real-time inspection.
+
 

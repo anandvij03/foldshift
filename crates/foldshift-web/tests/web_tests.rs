@@ -459,3 +459,78 @@ async fn test_api_audio_endpoints() {
 
     unsafe { std::env::remove_var("FOLDSHIFT_FFMPEG_PATH") };
 }
+
+#[tokio::test]
+async fn test_api_video_endpoints() {
+    let _guard = ENV_LOCK.lock().await;
+    let mock_path = mock_ffmpeg_bin();
+    unsafe { std::env::set_var("FOLDSHIFT_FFMPEG_PATH", &mock_path) };
+
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    tokio::spawn(async move {
+        axum::serve(listener, foldshift_web::app()).await.unwrap();
+    });
+
+    let boundary = "BOUNDARYVIDEO";
+    let ct = format!("multipart/form-data; boundary={}", boundary);
+
+    // 1. POST /api/video/inspect
+    let video_data = b"MOCK_VIDEO_DATA_FOR_TEST";
+    let inspect_body = build_multipart(boundary, Some(("file", "test_clip.mp4", video_data)), &[]);
+    let (head_insp, body_insp) =
+        send_request(addr, "POST", "/api/video/inspect", &ct, &inspect_body).await;
+    assert!(
+        head_insp.starts_with("HTTP/1.1 200 OK"),
+        "Expected 200 OK, got: {}",
+        head_insp
+    );
+    let insp_json: serde_json::Value = serde_json::from_slice(&body_insp).unwrap();
+    assert_eq!(insp_json["format"], "MP4");
+    assert_eq!(insp_json["media_kind"], "video");
+    assert_eq!(insp_json["properties"]["duration"], "00:02:15.50");
+    assert_eq!(insp_json["properties"]["video_codec"], "h264");
+    assert_eq!(insp_json["properties"]["resolution"], "1920x1080");
+
+    // 2. POST /api/video/convert
+    let convert_body = build_multipart(
+        boundary,
+        Some(("file", "clip.mp4", video_data)),
+        &[
+            ("format", "webm"),
+            ("width", "1280"),
+            ("fps", "30"),
+            ("crf", "23"),
+        ],
+    );
+    let (head_conv, body_conv) =
+        send_request(addr, "POST", "/api/video/convert", &ct, &convert_body).await;
+    assert!(
+        head_conv.starts_with("HTTP/1.1 200 OK"),
+        "Expected 200 OK, got: {}",
+        head_conv
+    );
+    assert!(head_conv.contains("video/webm"));
+    assert!(head_conv.contains("clip.webm"));
+    assert!(!body_conv.is_empty());
+
+    // 3. POST /api/video/extract-audio
+    let extract_body = build_multipart(
+        boundary,
+        Some(("file", "clip.mp4", video_data)),
+        &[("format", "mp3")],
+    );
+    let (head_ext, body_ext) =
+        send_request(addr, "POST", "/api/video/extract-audio", &ct, &extract_body).await;
+    assert!(
+        head_ext.starts_with("HTTP/1.1 200 OK"),
+        "Expected 200 OK, got: {}",
+        head_ext
+    );
+    assert!(head_ext.contains("audio/mpeg"));
+    assert!(head_ext.contains("clip.mp3"));
+    assert!(!body_ext.is_empty());
+
+    unsafe { std::env::remove_var("FOLDSHIFT_FFMPEG_PATH") };
+}

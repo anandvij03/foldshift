@@ -353,6 +353,188 @@ where
     summary
 }
 
+/// Executes a batch of items with bounded concurrency, independent failure isolation,
+/// real-time progress callbacks, and cooperative cancellation.
+///
+/// When `concurrency <= 1` or `items.len() <= 1`, execution delegates directly to `execute_sequential_batch`.
+/// When `concurrency > 1`, a worker thread pool of size `min(concurrency, total)` processes
+/// items from a shared queue while the calling thread coordinates progress reporting and cancellation.
+pub fn execute_bounded_batch<F>(
+    items: &[BatchItem],
+    concurrency: usize,
+    cancel_token: &CancellationToken,
+    mut progress: impl FnMut(BatchProgress<'_>),
+    worker: F,
+) -> BatchSummary
+where
+    F: Fn(&BatchItem) -> Result<u64> + Send + Sync,
+{
+    if concurrency <= 1 || items.len() <= 1 {
+        return execute_sequential_batch(items, cancel_token, progress, &worker);
+    }
+
+    let total = items.len();
+    progress(BatchProgress::Started { total });
+
+    let batch_start = Instant::now();
+    let num_workers = concurrency.min(total);
+
+    enum WorkerEvent {
+        ItemStarted {
+            index: usize,
+            input: PathBuf,
+            output: PathBuf,
+        },
+        ItemCompleted {
+            index: usize,
+            result: BatchItemResult,
+        },
+    }
+
+    let (tx, rx) = std::sync::mpsc::channel();
+    let next_index = std::sync::atomic::AtomicUsize::new(0);
+    let results_map = std::sync::Mutex::new(std::collections::BTreeMap::new());
+    let mut succeeded = 0;
+    let mut failed = 0;
+    let mut cancelled = 0;
+
+    std::thread::scope(|s| {
+        for _ in 0..num_workers {
+            let tx = tx.clone();
+            let next_index = &next_index;
+            let worker = &worker;
+
+            s.spawn(move || {
+                loop {
+                    if cancel_token.is_cancelled() {
+                        break;
+                    }
+
+                    let idx = next_index.fetch_add(1, Ordering::SeqCst);
+                    if idx >= items.len() {
+                        break;
+                    }
+
+                    let item = &items[idx];
+                    let item_index = idx + 1;
+
+                    let _ = tx.send(WorkerEvent::ItemStarted {
+                        index: item_index,
+                        input: item.input.clone(),
+                        output: item.output.clone(),
+                    });
+
+                    let item_start = Instant::now();
+                    let res = worker(item);
+                    let duration_ms = item_start.elapsed().as_millis() as u64;
+
+                    let item_res = match res {
+                        Ok(bytes) => BatchItemResult {
+                            id: item.id,
+                            input: item.input.clone(),
+                            output: item.output.clone(),
+                            status: ItemStatus::Success,
+                            bytes_written: Some(bytes),
+                            error: None,
+                            duration_ms,
+                        },
+                        Err(err) => {
+                            let err_str = err.to_string();
+                            let status = if err_str.contains("cancelled") {
+                                ItemStatus::Cancelled
+                            } else {
+                                ItemStatus::Failed
+                            };
+                            BatchItemResult {
+                                id: item.id,
+                                input: item.input.clone(),
+                                output: item.output.clone(),
+                                status,
+                                bytes_written: None,
+                                error: Some(err_str),
+                                duration_ms,
+                            }
+                        }
+                    };
+
+                    let _ = tx.send(WorkerEvent::ItemCompleted {
+                        index: item_index,
+                        result: item_res,
+                    });
+                }
+            });
+        }
+
+        drop(tx);
+
+        while let Ok(event) = rx.recv() {
+            match event {
+                WorkerEvent::ItemStarted {
+                    index,
+                    ref input,
+                    ref output,
+                } => {
+                    progress(BatchProgress::ItemStarted {
+                        index,
+                        total,
+                        input,
+                        output,
+                    });
+                }
+                WorkerEvent::ItemCompleted { index, result } => {
+                    match result.status {
+                        ItemStatus::Success => succeeded += 1,
+                        ItemStatus::Failed => failed += 1,
+                        ItemStatus::Cancelled => cancelled += 1,
+                        ItemStatus::Skipped => {}
+                    }
+                    progress(BatchProgress::ItemCompleted {
+                        index,
+                        total,
+                        result: &result,
+                    });
+                    results_map.lock().unwrap().insert(result.id, result);
+                }
+            }
+        }
+    });
+
+    let mut final_results = results_map.into_inner().unwrap();
+
+    if cancel_token.is_cancelled() || final_results.len() < total {
+        for item in items.iter() {
+            if let std::collections::btree_map::Entry::Vacant(entry) = final_results.entry(item.id)
+            {
+                cancelled += 1;
+                entry.insert(BatchItemResult {
+                    id: item.id,
+                    input: item.input.clone(),
+                    output: item.output.clone(),
+                    status: ItemStatus::Cancelled,
+                    bytes_written: None,
+                    error: Some("Operation cancelled by user".to_string()),
+                    duration_ms: 0,
+                });
+            }
+        }
+    }
+
+    let results: Vec<BatchItemResult> = final_results.into_values().collect();
+
+    let summary = BatchSummary {
+        total,
+        succeeded,
+        failed,
+        skipped: 0,
+        cancelled,
+        duration_ms: batch_start.elapsed().as_millis() as u64,
+        items: results,
+    };
+
+    progress(BatchProgress::Finished { summary: &summary });
+    summary
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -520,5 +702,56 @@ mod tests {
         assert_eq!(summary.cancelled, 2);
         assert_eq!(summary.items[1].status, ItemStatus::Cancelled);
         assert_eq!(summary.items[2].status, ItemStatus::Cancelled);
+    }
+
+    #[test]
+    fn test_bounded_batch_concurrency_and_failures() {
+        let items = vec![
+            BatchItem {
+                id: 1,
+                input: PathBuf::from("good1.mp4"),
+                output: PathBuf::from("good1.webm"),
+            },
+            BatchItem {
+                id: 2,
+                input: PathBuf::from("fail.mp4"),
+                output: PathBuf::from("fail.webm"),
+            },
+            BatchItem {
+                id: 3,
+                input: PathBuf::from("good2.mp4"),
+                output: PathBuf::from("good2.webm"),
+            },
+            BatchItem {
+                id: 4,
+                input: PathBuf::from("good3.mp4"),
+                output: PathBuf::from("good3.webm"),
+            },
+        ];
+
+        let cancel_token = CancellationToken::new();
+        let summary = execute_bounded_batch(
+            &items,
+            2, // concurrency = 2
+            &cancel_token,
+            |_| {},
+            |item| {
+                if item.id == 2 {
+                    Err(FcError::Conversion("corrupt video bitstream".to_string()))
+                } else {
+                    Ok(1024)
+                }
+            },
+        );
+
+        assert_eq!(summary.total, 4);
+        assert_eq!(summary.succeeded, 3);
+        assert_eq!(summary.failed, 1);
+        assert_eq!(summary.cancelled, 0);
+
+        assert_eq!(summary.items[0].status, ItemStatus::Success);
+        assert_eq!(summary.items[1].status, ItemStatus::Failed);
+        assert_eq!(summary.items[2].status, ItemStatus::Success);
+        assert_eq!(summary.items[3].status, ItemStatus::Success);
     }
 }

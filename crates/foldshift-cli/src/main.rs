@@ -39,8 +39,12 @@ enum Command {
         #[command(subcommand)]
         command: AudioCommand,
     },
+    /// Video-specific operations.
+    Video {
+        #[command(subcommand)]
+        command: VideoCommand,
+    },
     /// Inspect a supported local file.
-    #[cfg(feature = "image")]
     Inspect {
         file: PathBuf,
         /// Emit machine-readable JSON.
@@ -169,6 +173,66 @@ struct AudioConvertArgs {
     force: bool,
 }
 
+#[derive(Debug, Subcommand)]
+enum VideoCommand {
+    /// Inspect a video file's duration, bitrate, resolution, fps, and codecs.
+    Inspect {
+        file: PathBuf,
+        /// Emit machine-readable JSON.
+        #[arg(long)]
+        json: bool,
+    },
+    /// Convert/transcode a video file to a target format or adjust resolution/fps.
+    Convert(VideoConvertArgs),
+    /// Extract the audio stream from a video file into an audio format.
+    ExtractAudio(VideoExtractAudioArgs),
+}
+
+#[derive(Debug, Args)]
+struct VideoConvertArgs {
+    input: PathBuf,
+    output: PathBuf,
+    /// Target resolution in WIDTHxHEIGHT format (e.g. "1920x1080").
+    #[arg(long)]
+    resolution: Option<String>,
+    /// Maximum output width in pixels. Preserves aspect ratio if height is omitted.
+    #[arg(long)]
+    width: Option<u32>,
+    /// Maximum output height in pixels. Preserves aspect ratio if width is omitted.
+    #[arg(long)]
+    height: Option<u32>,
+    /// Target frame rate in FPS (e.g. 24, 30, 60).
+    #[arg(long)]
+    fps: Option<f32>,
+    /// Constant Rate Factor (CRF) quality (e.g. 18-28). Lower = higher quality.
+    #[arg(long)]
+    crf: Option<u8>,
+    /// Target video bitrate (e.g. "2M", "1500k").
+    #[arg(long)]
+    video_bitrate: Option<String>,
+    /// Target audio bitrate (e.g. "128k", "192k").
+    #[arg(long)]
+    audio_bitrate: Option<String>,
+    /// Strip audio stream from output video.
+    #[arg(long)]
+    mute_audio: bool,
+    /// Target video codec (e.g. "libx264", "libvpx-vp9").
+    #[arg(long)]
+    video_codec: Option<String>,
+    /// Replace an existing output file.
+    #[arg(long)]
+    force: bool,
+}
+
+#[derive(Debug, Args)]
+struct VideoExtractAudioArgs {
+    input: PathBuf,
+    output: PathBuf,
+    /// Replace an existing output file.
+    #[arg(long)]
+    force: bool,
+}
+
 #[cfg(feature = "image")]
 #[derive(Debug, Subcommand)]
 enum ImageCommand {
@@ -218,6 +282,8 @@ enum BatchCommand {
     Resize(BatchResizeArgs),
     /// Convert multiple audio files sequentially with progress reporting.
     Audio(BatchAudioArgs),
+    /// Convert multiple video files with measured bounded concurrency.
+    Video(BatchVideoArgs),
 }
 
 #[derive(Debug, Args)]
@@ -243,6 +309,61 @@ struct BatchAudioArgs {
     /// Target channels count (1 for mono, 2 for stereo).
     #[arg(long)]
     channels: Option<u8>,
+    /// Concurrency limit for audio workers (defaults to 1).
+    #[arg(short = 'j', long, default_value_t = 1)]
+    concurrency: usize,
+    /// Overwrite existing output files.
+    #[arg(long)]
+    force: bool,
+    /// Emit machine-readable JSON summary upon completion.
+    #[arg(long)]
+    json: bool,
+}
+
+#[derive(Debug, Args)]
+struct BatchVideoArgs {
+    /// Input video files to convert.
+    #[arg(required = true, num_args = 1..)]
+    inputs: Vec<PathBuf>,
+    /// Destination video format / extension (e.g. 'mp4', 'webm', 'mkv', 'avi', 'mov', 'flv', 'wmv', 'm4v').
+    #[arg(long, short = 't')]
+    to: String,
+    /// Directory where converted files will be saved.
+    #[arg(long, short = 'o')]
+    out_dir: PathBuf,
+    /// Naming pattern for output files (e.g. '{stem}.{ext}', '{stem}-converted.{ext}', '{index:03}_{stem}.{ext}').
+    #[arg(long)]
+    pattern: Option<String>,
+    /// Target resolution in WIDTHxHEIGHT format (e.g. "1920x1080").
+    #[arg(long)]
+    resolution: Option<String>,
+    /// Maximum output width in pixels. Preserves aspect ratio if height is omitted.
+    #[arg(long)]
+    width: Option<u32>,
+    /// Maximum output height in pixels. Preserves aspect ratio if width is omitted.
+    #[arg(long)]
+    height: Option<u32>,
+    /// Target frame rate in FPS (e.g. 24, 30, 60).
+    #[arg(long)]
+    fps: Option<f32>,
+    /// Constant Rate Factor (CRF) quality (e.g. 18-28). Lower = higher quality.
+    #[arg(long)]
+    crf: Option<u8>,
+    /// Target video bitrate (e.g. "2M", "1500k").
+    #[arg(long)]
+    video_bitrate: Option<String>,
+    /// Target audio bitrate (e.g. "128k", "192k").
+    #[arg(long)]
+    audio_bitrate: Option<String>,
+    /// Strip audio stream from output video.
+    #[arg(long)]
+    mute_audio: bool,
+    /// Target video codec (e.g. "libx264", "libvpx-vp9").
+    #[arg(long)]
+    video_codec: Option<String>,
+    /// Concurrency limit for video workers (defaults to 1 to prevent system starvation).
+    #[arg(short = 'j', long, default_value_t = 1)]
+    concurrency: usize,
     /// Overwrite existing output files.
     #[arg(long)]
     force: bool,
@@ -352,7 +473,11 @@ fn run() -> Result<()> {
             AudioCommand::Inspect { file, json } => audio_inspect(file, json)?,
             AudioCommand::Convert(args) => audio_convert(args)?,
         },
-        #[cfg(feature = "image")]
+        Command::Video { command } => match command {
+            VideoCommand::Inspect { file, json } => video_inspect(file, json)?,
+            VideoCommand::Convert(args) => video_convert(args)?,
+            VideoCommand::ExtractAudio(args) => video_extract_audio(args)?,
+        },
         Command::Inspect { file, json } => inspect(file, json)?,
         #[cfg(feature = "image")]
         Command::Convert(args)
@@ -369,6 +494,7 @@ fn run() -> Result<()> {
             #[cfg(feature = "image")]
             BatchCommand::Resize(args) => batch_resize_cmd(args)?,
             BatchCommand::Audio(args) => batch_audio_cmd(args)?,
+            BatchCommand::Video(args) => batch_video_cmd(args)?,
         },
     }
     Ok(())
@@ -557,20 +683,43 @@ fn packs_remove(capability: String) -> Result<()> {
     Ok(())
 }
 
-#[cfg(feature = "image")]
 fn inspect(file: PathBuf, json_output: bool) -> Result<()> {
-    let inspection = foldshift_image::inspect(&file)?;
-    if json_output {
-        println!("{}", serde_json::to_string_pretty(&inspection)?);
-    } else {
-        println!("File    {}", inspection.path.display());
-        println!("Type    {}", inspection.format);
-        println!("Size    {} bytes", inspection.bytes);
-        for (key, value) in inspection.properties {
-            println!("{:<8}{}", title_case(&key), plain_json(value));
-        }
+    let ext = file
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+
+    if ext == "pdf" {
+        return pdf_inspect(file, json_output);
     }
-    Ok(())
+
+    if foldshift_media::is_supported_audio_extension(&ext) {
+        return audio_inspect(file, json_output);
+    }
+
+    if foldshift_media::is_supported_video_extension(&ext) {
+        return video_inspect(file, json_output);
+    }
+
+    #[cfg(feature = "image")]
+    {
+        let inspection = foldshift_image::inspect(&file)?;
+        if json_output {
+            println!("{}", serde_json::to_string_pretty(&inspection)?);
+        } else {
+            println!("File    {}", inspection.path.display());
+            println!("Type    {}", inspection.format);
+            println!("Size    {} bytes", inspection.bytes);
+            for (key, value) in inspection.properties {
+                println!("{:<8}{}", title_case(&key), plain_json(value));
+            }
+        }
+        Ok(())
+    }
+
+    #[cfg(not(feature = "image"))]
+    anyhow::bail!("unsupported file format for inspection: {}", file.display());
 }
 
 #[cfg(feature = "image")]
@@ -747,7 +896,7 @@ fn batch_audio_cmd(args: BatchAudioArgs) -> Result<()> {
     });
 
     let json_mode = args.json;
-    let summary = foldshift_media::batch_convert(
+    let summary = foldshift_media::batch_convert_audio(
         &args.inputs,
         &args.to,
         &args.out_dir,
@@ -758,6 +907,7 @@ fn batch_audio_cmd(args: BatchAudioArgs) -> Result<()> {
             channels: args.channels,
             force: args.force,
         },
+        args.concurrency,
         &cancel_token,
         |ev| {
             if !json_mode {
@@ -910,6 +1060,157 @@ fn audio_convert(args: AudioConvertArgs) -> Result<()> {
         args.input.display(),
         args.output.display()
     );
+    Ok(())
+}
+
+fn video_inspect(file: PathBuf, json_output: bool) -> Result<()> {
+    let inspection = foldshift_media::inspect(&file)?;
+    if json_output {
+        println!("{}", serde_json::to_string_pretty(&inspection)?);
+    } else {
+        println!("File    {}", inspection.path.display());
+        println!("Type    {}", inspection.format);
+        println!("Size    {} bytes", inspection.bytes);
+        for (key, value) in inspection.properties {
+            println!("{:<14}{}", title_case(&key), plain_json(value));
+        }
+    }
+    Ok(())
+}
+
+fn parse_resolution(res: &str) -> Result<(u32, u32)> {
+    let parts: Vec<&str> = res.split('x').collect();
+    if parts.len() != 2 {
+        anyhow::bail!(
+            "invalid resolution format: '{}', expected WIDTHxHEIGHT (e.g. '1920x1080')",
+            res
+        );
+    }
+    let w = parts[0]
+        .parse::<u32>()
+        .map_err(|_| anyhow::anyhow!("invalid width in resolution '{}'", res))?;
+    let h = parts[1]
+        .parse::<u32>()
+        .map_err(|_| anyhow::anyhow!("invalid height in resolution '{}'", res))?;
+    if w == 0 || h == 0 {
+        anyhow::bail!("resolution dimensions must be greater than zero");
+    }
+    Ok((w, h))
+}
+
+fn video_convert(args: VideoConvertArgs) -> Result<()> {
+    let resolution = if let Some(r) = &args.resolution {
+        Some(parse_resolution(r)?)
+    } else {
+        match (args.width, args.height) {
+            (Some(w), Some(h)) => Some((w, h)),
+            _ => None,
+        }
+    };
+    foldshift_media::convert_video(
+        &args.input,
+        &args.output,
+        foldshift_media::VideoConvertOptions {
+            resolution,
+            width: args.width,
+            height: args.height,
+            fps: args.fps,
+            crf: args.crf,
+            video_bitrate: args.video_bitrate,
+            audio_bitrate: args.audio_bitrate,
+            mute_audio: args.mute_audio,
+            video_codec: args.video_codec,
+            force: args.force,
+        },
+    )?;
+    println!(
+        "Converted {} -> {}",
+        args.input.display(),
+        args.output.display()
+    );
+    Ok(())
+}
+
+fn video_extract_audio(args: VideoExtractAudioArgs) -> Result<()> {
+    foldshift_media::extract_audio(&args.input, &args.output, args.force)?;
+    println!(
+        "Extracted audio {} -> {}",
+        args.input.display(),
+        args.output.display()
+    );
+    Ok(())
+}
+
+fn batch_video_cmd(args: BatchVideoArgs) -> Result<()> {
+    let cancel_token = foldshift_core::batch::CancellationToken::new();
+    let handler_token = cancel_token.clone();
+    let interrupt_count = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let interrupt_clone = interrupt_count.clone();
+
+    let _ = ctrlc::set_handler(move || {
+        let prev = interrupt_clone.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        if prev == 0 {
+            eprintln!(
+                "\nCancellation requested (Ctrl+C). Safely stopping video batch after current item..."
+            );
+            handler_token.cancel();
+        } else {
+            eprintln!("\nSecond interrupt received. Terminating immediately.");
+            std::process::exit(130);
+        }
+    });
+
+    let resolution = if let Some(r) = &args.resolution {
+        Some(parse_resolution(r)?)
+    } else {
+        match (args.width, args.height) {
+            (Some(w), Some(h)) => Some((w, h)),
+            _ => None,
+        }
+    };
+
+    let json_mode = args.json;
+    let summary = foldshift_media::batch_convert_video(
+        &args.inputs,
+        &args.to,
+        &args.out_dir,
+        args.pattern.as_deref(),
+        foldshift_media::VideoConvertOptions {
+            resolution,
+            width: args.width,
+            height: args.height,
+            fps: args.fps,
+            crf: args.crf,
+            video_bitrate: args.video_bitrate,
+            audio_bitrate: args.audio_bitrate,
+            mute_audio: args.mute_audio,
+            video_codec: args.video_codec,
+            force: args.force,
+        },
+        args.concurrency,
+        &cancel_token,
+        |ev| {
+            if !json_mode {
+                render_batch_progress(&ev);
+            }
+        },
+    )?;
+
+    if json_mode {
+        println!("{}", serde_json::to_string_pretty(&summary)?);
+    } else {
+        render_batch_summary(&summary);
+    }
+
+    if summary.has_failures_or_cancellations() {
+        anyhow::bail!(
+            "Batch completed with issues: {} succeeded, {} failed, {} cancelled",
+            summary.succeeded,
+            summary.failed,
+            summary.cancelled
+        );
+    }
+
     Ok(())
 }
 

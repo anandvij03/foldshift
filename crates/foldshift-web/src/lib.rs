@@ -19,6 +19,7 @@ pub struct SystemStatus {
     pub version: &'static str,
     pub supported_extensions: &'static [&'static str],
     pub supported_audio_extensions: &'static [&'static str],
+    pub supported_video_extensions: &'static [&'static str],
     pub capabilities: Vec<foldshift_core::OperationInfo>,
     pub pdf_available: bool,
     pub pdf_source: Option<String>,
@@ -39,6 +40,9 @@ pub fn app() -> Router {
         .route("/api/pdf/extract", post(api_pdf_extract))
         .route("/api/audio/inspect", post(api_audio_inspect))
         .route("/api/audio/convert", post(api_audio_convert))
+        .route("/api/video/inspect", post(api_video_inspect))
+        .route("/api/video/convert", post(api_video_convert))
+        .route("/api/video/extract-audio", post(api_video_extract_audio))
         .layer(DefaultBodyLimit::max(100 * 102_400)) // 100 MB limit
 }
 
@@ -116,6 +120,7 @@ async fn api_capabilities() -> Json<SystemStatus> {
         version: "0.1.0",
         supported_extensions: foldshift_image::SUPPORTED_EXTENSIONS,
         supported_audio_extensions: foldshift_media::SUPPORTED_AUDIO_EXTENSIONS,
+        supported_video_extensions: foldshift_media::SUPPORTED_VIDEO_EXTENSIONS,
         capabilities: foldshift_core::operations_with(|cap| match cap {
             "image" => true,
             "pdf" => is_pdf_available,
@@ -276,7 +281,9 @@ async fn api_inspect(
             };
             (status, Json(json!({ "error": e.to_string() })))
         })?
-    } else if foldshift_media::is_supported_audio_extension(ext) {
+    } else if foldshift_media::is_supported_audio_extension(ext)
+        || foldshift_media::is_supported_video_extension(ext)
+    {
         foldshift_media::inspect(temp_file.path()).map_err(|e| {
             let status = match e {
                 foldshift_core::FcError::CapabilityUnavailable(_) => {
@@ -935,6 +942,388 @@ async fn api_audio_convert(
     };
 
     foldshift_media::convert(temp_input.path(), &output_path, options).map_err(|e| {
+        let status = match e {
+            foldshift_core::FcError::CapabilityUnavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
+            _ => StatusCode::UNPROCESSABLE_ENTITY,
+        };
+        (status, Json(json!({ "error": e.to_string() })))
+    })?;
+
+    let out_bytes = std::fs::read(&output_path).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    let stem = Path::new(&filename)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("output");
+    let download_name = format!("{}.{}", stem, target_format);
+
+    let mime_type = match target_format.as_str() {
+        "mp3" => "audio/mpeg",
+        "wav" => "audio/wav",
+        "flac" => "audio/flac",
+        "ogg" => "audio/ogg",
+        "m4a" => "audio/mp4",
+        "aac" => "audio/aac",
+        "opus" => "audio/opus",
+        "wma" => "audio/x-ms-wma",
+        _ => "application/octet-stream",
+    };
+
+    let mut response = out_bytes.into_response();
+    response.headers_mut().insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_str(mime_type).unwrap(),
+    );
+    response.headers_mut().insert(
+        header::CONTENT_DISPOSITION,
+        HeaderValue::from_str(&format!("attachment; filename=\"{}\"", download_name)).unwrap(),
+    );
+
+    Ok(response)
+}
+
+async fn api_video_inspect(
+    mut multipart: Multipart,
+) -> Result<Json<foldshift_core::Inspection>, (StatusCode, Json<serde_json::Value>)> {
+    let mut file_data: Option<(String, Vec<u8>)> = None;
+
+    while let Ok(Some(field)) = multipart.next_field().await {
+        let name = field.name().unwrap_or_default().to_string();
+        if name == "file" {
+            let filename = field.file_name().unwrap_or("sample.mp4").to_string();
+            let bytes = field.bytes().await.map_err(|e| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({ "error": format!("Upload error: {}", e) })),
+                )
+            })?;
+            file_data = Some((filename, bytes.to_vec()));
+            break;
+        }
+    }
+
+    let (filename, bytes) = file_data.ok_or_else(|| {
+        (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "No file uploaded" })),
+        )
+    })?;
+
+    let in_ext = Path::new(&filename)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("mp4");
+
+    let temp_file = tempfile::Builder::new()
+        .suffix(&format!(".{}", in_ext))
+        .tempfile()
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?;
+
+    std::fs::write(temp_file.path(), &bytes).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    let inspection = foldshift_media::inspect(temp_file.path()).map_err(|e| {
+        let status = match e {
+            foldshift_core::FcError::CapabilityUnavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
+            _ => StatusCode::UNPROCESSABLE_ENTITY,
+        };
+        (status, Json(json!({ "error": e.to_string() })))
+    })?;
+
+    let mut modified = inspection;
+    modified.path = PathBuf::from(filename);
+
+    Ok(Json(modified))
+}
+
+async fn api_video_convert(
+    mut multipart: Multipart,
+) -> Result<Response, (StatusCode, Json<serde_json::Value>)> {
+    let mut file_data: Option<(String, Vec<u8>)> = None;
+    let mut target_format = String::from("mp4");
+    let mut width: Option<u32> = None;
+    let mut height: Option<u32> = None;
+    let mut fps: Option<f32> = None;
+    let mut crf: Option<u8> = None;
+    let mut video_bitrate: Option<String> = None;
+    let mut audio_bitrate: Option<String> = None;
+    let mut mute_audio = false;
+    let force = true;
+
+    while let Ok(Some(field)) = multipart.next_field().await {
+        let name = field.name().unwrap_or_default().to_string();
+        match name.as_str() {
+            "file" => {
+                let filename = field.file_name().unwrap_or("input.mp4").to_string();
+                let bytes = field.bytes().await.map_err(|e| {
+                    (
+                        StatusCode::BAD_REQUEST,
+                        Json(json!({ "error": format!("Upload error: {}", e) })),
+                    )
+                })?;
+                file_data = Some((filename, bytes.to_vec()));
+            }
+            "format" | "to" => {
+                if let Ok(text) = field.text().await {
+                    let trimmed = text.trim().to_lowercase();
+                    if !trimmed.is_empty() {
+                        target_format = trimmed;
+                    }
+                }
+            }
+            "width" => {
+                if let Some(val) = field
+                    .text()
+                    .await
+                    .ok()
+                    .and_then(|t| t.trim().parse::<u32>().ok())
+                    .filter(|&v| v > 0)
+                {
+                    width = Some(val);
+                }
+            }
+            "height" => {
+                if let Some(val) = field
+                    .text()
+                    .await
+                    .ok()
+                    .and_then(|t| t.trim().parse::<u32>().ok())
+                    .filter(|&v| v > 0)
+                {
+                    height = Some(val);
+                }
+            }
+            "fps" => {
+                if let Some(val) = field
+                    .text()
+                    .await
+                    .ok()
+                    .and_then(|t| t.trim().parse::<f32>().ok())
+                    .filter(|&v| v > 0.0)
+                {
+                    fps = Some(val);
+                }
+            }
+            "crf" => {
+                if let Some(val) = field
+                    .text()
+                    .await
+                    .ok()
+                    .and_then(|t| t.trim().parse::<u8>().ok())
+                {
+                    crf = Some(val);
+                }
+            }
+            "video_bitrate" => {
+                if let Ok(text) = field.text().await {
+                    let trimmed = text.trim().to_lowercase();
+                    if !trimmed.is_empty() {
+                        video_bitrate = Some(trimmed);
+                    }
+                }
+            }
+            "audio_bitrate" => {
+                if let Ok(text) = field.text().await {
+                    let trimmed = text.trim().to_lowercase();
+                    if !trimmed.is_empty() {
+                        audio_bitrate = Some(trimmed);
+                    }
+                }
+            }
+            "mute_audio" => {
+                if let Ok(text) = field.text().await {
+                    let trimmed = text.trim().to_lowercase();
+                    mute_audio = trimmed == "true" || trimmed == "1" || trimmed == "yes";
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let (filename, bytes) = file_data.ok_or_else(|| {
+        (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "No file uploaded" })),
+        )
+    })?;
+
+    let in_ext = Path::new(&filename)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("mp4");
+
+    let temp_input = tempfile::Builder::new()
+        .suffix(&format!(".{}", in_ext))
+        .tempfile()
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?;
+
+    std::fs::write(temp_input.path(), &bytes).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    let temp_dir = tempfile::tempdir().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+    })?;
+    let output_path = temp_dir.path().join(format!("output.{}", target_format));
+
+    let resolution = match (width, height) {
+        (Some(w), Some(h)) => Some((w, h)),
+        _ => None,
+    };
+
+    let options = foldshift_media::VideoConvertOptions {
+        resolution,
+        width,
+        height,
+        fps,
+        crf,
+        video_bitrate,
+        audio_bitrate,
+        mute_audio,
+        video_codec: None,
+        force,
+    };
+
+    foldshift_media::convert_video(temp_input.path(), &output_path, options).map_err(|e| {
+        let status = match e {
+            foldshift_core::FcError::CapabilityUnavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
+            _ => StatusCode::UNPROCESSABLE_ENTITY,
+        };
+        (status, Json(json!({ "error": e.to_string() })))
+    })?;
+
+    let out_bytes = std::fs::read(&output_path).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    let stem = Path::new(&filename)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("output");
+    let download_name = format!("{}.{}", stem, target_format);
+
+    let mime_type = match target_format.as_str() {
+        "mp4" | "m4v" => "video/mp4",
+        "webm" => "video/webm",
+        "mkv" => "video/x-matroska",
+        "mov" => "video/quicktime",
+        "avi" => "video/x-msvideo",
+        "wmv" => "video/x-ms-wmv",
+        "flv" => "video/x-flv",
+        _ => "application/octet-stream",
+    };
+
+    let mut response = out_bytes.into_response();
+    response.headers_mut().insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_str(mime_type).unwrap(),
+    );
+    response.headers_mut().insert(
+        header::CONTENT_DISPOSITION,
+        HeaderValue::from_str(&format!("attachment; filename=\"{}\"", download_name)).unwrap(),
+    );
+
+    Ok(response)
+}
+
+async fn api_video_extract_audio(
+    mut multipart: Multipart,
+) -> Result<Response, (StatusCode, Json<serde_json::Value>)> {
+    let mut file_data: Option<(String, Vec<u8>)> = None;
+    let mut target_format = String::from("mp3");
+    let force = true;
+
+    while let Ok(Some(field)) = multipart.next_field().await {
+        let name = field.name().unwrap_or_default().to_string();
+        match name.as_str() {
+            "file" => {
+                let filename = field.file_name().unwrap_or("input.mp4").to_string();
+                let bytes = field.bytes().await.map_err(|e| {
+                    (
+                        StatusCode::BAD_REQUEST,
+                        Json(json!({ "error": format!("Upload error: {}", e) })),
+                    )
+                })?;
+                file_data = Some((filename, bytes.to_vec()));
+            }
+            "format" | "to" => {
+                if let Ok(text) = field.text().await {
+                    let trimmed = text.trim().to_lowercase();
+                    if !trimmed.is_empty() {
+                        target_format = trimmed;
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let (filename, bytes) = file_data.ok_or_else(|| {
+        (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "No file uploaded" })),
+        )
+    })?;
+
+    let in_ext = Path::new(&filename)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("mp4");
+
+    let temp_input = tempfile::Builder::new()
+        .suffix(&format!(".{}", in_ext))
+        .tempfile()
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+        })?;
+
+    std::fs::write(temp_input.path(), &bytes).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    let temp_dir = tempfile::tempdir().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+    })?;
+    let output_path = temp_dir.path().join(format!("output.{}", target_format));
+
+    foldshift_media::extract_audio(temp_input.path(), &output_path, force).map_err(|e| {
         let status = match e {
             foldshift_core::FcError::CapabilityUnavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
             _ => StatusCode::UNPROCESSABLE_ENTITY,

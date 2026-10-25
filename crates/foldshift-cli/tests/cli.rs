@@ -1135,3 +1135,117 @@ fn cli_batch_audio_independent_failures() {
     assert!(!out_dir.join("corrupt.mp3").exists());
     assert!(out_dir.join("good2.mp3").exists());
 }
+
+#[test]
+fn cli_video_inspect_convert_and_extract_audio() {
+    let dir = tempfile::tempdir().unwrap();
+    let video = dir.path().join("sample.mp4");
+    let out_video = dir.path().join("transcoded.webm");
+    let out_audio = dir.path().join("soundtrack.mp3");
+
+    std::fs::write(&video, b"SAMPLE_VIDEO_CONTENT").unwrap();
+    let mock_bin = mock_ffmpeg_bin();
+
+    // 1. Video inspect
+    let res_inspect = Command::new(env!("CARGO_BIN_EXE_foldshift"))
+        .args(["video", "inspect"])
+        .arg(&video)
+        .arg("--json")
+        .env("FOLDSHIFT_FFMPEG_PATH", &mock_bin)
+        .output()
+        .unwrap();
+    assert!(
+        res_inspect.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&res_inspect.stderr)
+    );
+    let insp_json: serde_json::Value = serde_json::from_slice(&res_inspect.stdout).unwrap();
+    assert_eq!(insp_json["format"], "MP4");
+    assert_eq!(insp_json["media_kind"], "video");
+    assert_eq!(insp_json["properties"]["duration"], "00:02:15.50");
+    assert_eq!(insp_json["properties"]["video_codec"], "h264");
+    assert_eq!(insp_json["properties"]["resolution"], "1920x1080");
+
+    // 2. Video convert
+    let res_convert = Command::new(env!("CARGO_BIN_EXE_foldshift"))
+        .args(["video", "convert"])
+        .arg(&video)
+        .arg(&out_video)
+        .args(["--width", "1280", "--fps", "30", "--crf", "23"])
+        .env("FOLDSHIFT_FFMPEG_PATH", &mock_bin)
+        .output()
+        .unwrap();
+    assert!(
+        res_convert.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&res_convert.stderr)
+    );
+    assert!(out_video.exists());
+    assert_eq!(std::fs::read(&out_video).unwrap(), b"MOCK_VIDEO_PAYLOAD");
+
+    // 3. Extract audio
+    let res_extract = Command::new(env!("CARGO_BIN_EXE_foldshift"))
+        .args(["video", "extract-audio"])
+        .arg(&video)
+        .arg(&out_audio)
+        .env("FOLDSHIFT_FFMPEG_PATH", &mock_bin)
+        .output()
+        .unwrap();
+    assert!(
+        res_extract.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&res_extract.stderr)
+    );
+    assert!(out_audio.exists());
+    assert_eq!(
+        std::fs::read(&out_audio).unwrap(),
+        b"MOCK_EXTRACTED_AUDIO_PAYLOAD"
+    );
+}
+
+#[test]
+fn cli_batch_video_convert_with_bounded_concurrency() {
+    let dir = tempfile::tempdir().unwrap();
+    let clip1 = dir.path().join("clip1.mp4");
+    let clip2 = dir.path().join("clip2.mov");
+    let clip3 = dir.path().join("clip3.mkv");
+
+    std::fs::write(&clip1, b"CLIP1").unwrap();
+    std::fs::write(&clip2, b"CLIP2").unwrap();
+    std::fs::write(&clip3, b"CLIP3").unwrap();
+
+    let out_dir = dir.path().join("video_batch_out");
+    let mock_bin = mock_ffmpeg_bin();
+
+    let res = Command::new(env!("CARGO_BIN_EXE_foldshift"))
+        .args(["batch", "video"])
+        .arg(&clip1)
+        .arg(&clip2)
+        .arg(&clip3)
+        .args(["-t", "webm", "-o"])
+        .arg(&out_dir)
+        .args([
+            "--pattern",
+            "batch_{index:02}_{stem}.{ext}",
+            "--concurrency",
+            "2",
+            "--json",
+        ])
+        .env("FOLDSHIFT_FFMPEG_PATH", &mock_bin)
+        .output()
+        .unwrap();
+
+    assert!(
+        res.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&res.stderr)
+    );
+    let summary: serde_json::Value = serde_json::from_slice(&res.stdout).unwrap();
+    assert_eq!(summary["total"], 3);
+    assert_eq!(summary["succeeded"], 3);
+    assert_eq!(summary["failed"], 0);
+
+    assert!(out_dir.join("batch_01_clip1.webm").exists());
+    assert!(out_dir.join("batch_02_clip2.webm").exists());
+    assert!(out_dir.join("batch_03_clip3.webm").exists());
+}
