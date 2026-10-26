@@ -485,6 +485,7 @@ dependencies = [
  "anyhow",
  "axum",
  "clap",
+ "ctrlc",
  "foldshift-core",
  "foldshift-image",
  "foldshift-media",

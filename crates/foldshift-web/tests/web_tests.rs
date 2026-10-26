@@ -534,3 +534,55 @@ async fn test_api_video_endpoints() {
 
     unsafe { std::env::remove_var("FOLDSHIFT_FFMPEG_PATH") };
 }
+
+#[tokio::test]
+async fn test_api_manifest() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    tokio::spawn(async move {
+        axum::serve(listener, foldshift_web::app()).await.unwrap();
+    });
+
+    let (head, body) = send_request(addr, "GET", "/api/manifest", "application/json", &[]).await;
+    assert!(head.starts_with("HTTP/1.1 200 OK"), "Got head: {}", head);
+
+    let val: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(val["manifest"]["schema_version"], "1.0.0");
+    assert!(val["manifest"]["artifacts"].is_array());
+    assert!(val["engine_packs"].is_array());
+    assert!(val["capabilities"].is_array());
+}
+
+#[tokio::test]
+async fn test_api_system_shutdown() {
+    let (shutdown_tx, mut shutdown_rx) = tokio::sync::watch::channel(false);
+    let app = foldshift_web::app_with_state(foldshift_web::WebState { shutdown_tx });
+
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    let server_handle = tokio::spawn(async move {
+        axum::serve(listener, app)
+            .with_graceful_shutdown(async move {
+                while !*shutdown_rx.borrow() {
+                    if shutdown_rx.changed().await.is_err() {
+                        break;
+                    }
+                }
+            })
+            .await
+            .unwrap();
+    });
+
+    let (head, body) =
+        send_request(addr, "POST", "/api/system/shutdown", "application/json", &[]).await;
+    assert!(head.starts_with("HTTP/1.1 200 OK"), "Got head: {}", head);
+
+    let val: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(val["status"], "shutting_down");
+
+    // The server handle should finish cleanly within a short timeout
+    let finished = tokio::time::timeout(std::time::Duration::from_secs(5), server_handle).await;
+    assert!(finished.is_ok(), "Server failed to shut down within timeout");
+}

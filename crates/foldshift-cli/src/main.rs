@@ -65,6 +65,18 @@ enum Command {
         #[command(subcommand)]
         command: BatchCommand,
     },
+    /// Launch the local FoldShift desktop/web graphical interface.
+    Ui {
+        /// Host address to bind to.
+        #[arg(long, default_value = "127.0.0.1")]
+        host: String,
+        /// Port to listen on.
+        #[arg(short, long, default_value_t = 8080)]
+        port: u16,
+        /// Do not automatically open the default web browser.
+        #[arg(long)]
+        no_open: bool,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -496,7 +508,91 @@ fn run() -> Result<()> {
             BatchCommand::Audio(args) => batch_audio_cmd(args)?,
             BatchCommand::Video(args) => batch_video_cmd(args)?,
         },
+        Command::Ui { host, port, no_open } => ui_cmd(&host, port, no_open)?,
     }
+    Ok(())
+}
+
+fn resolve_ui_executable() -> Option<PathBuf> {
+    if let Ok(env_path) = std::env::var("FOLDSHIFT_WEB_PATH") {
+        let p = PathBuf::from(env_path);
+        if p.is_file() {
+            return Some(p);
+        }
+    }
+
+    let bin_name = if cfg!(windows) {
+        "foldshift-web.exe"
+    } else {
+        "foldshift-web"
+    };
+
+    if let Ok(current_exe) = std::env::current_exe() {
+        if let Some(parent) = current_exe.parent() {
+            let adjacent = parent.join(bin_name);
+            if adjacent.is_file() {
+                return Some(adjacent);
+            }
+        }
+    }
+
+    let dev_candidates = [
+        format!("target/release/{}", bin_name),
+        format!("target/debug/{}", bin_name),
+        format!("../target/release/{}", bin_name),
+        format!("../target/debug/{}", bin_name),
+    ];
+    for cand in dev_candidates {
+        let p = PathBuf::from(cand);
+        if p.is_file() {
+            return Some(p);
+        }
+    }
+
+    if let Ok(path_var) = std::env::var("PATH") {
+        for dir in std::env::split_paths(&path_var) {
+            let candidate = dir.join(bin_name);
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+        }
+    }
+
+    None
+}
+
+fn ui_cmd(host: &str, port: u16, no_open: bool) -> Result<()> {
+    let engine = match resolve_ui_executable() {
+        Some(path) => path,
+        None => {
+            anyhow::bail!(
+                "FoldShift Web UI executable ('foldshift-web') was not found adjacent to this binary or in PATH.\n\
+                 The Web UI is an optional desktop distribution package.\n\
+                 To launch the interface:\n\
+                   1. Download 'foldshift-web' from the release manifest, or\n\
+                   2. Build locally: cargo build -p foldshift-web --release, or\n\
+                   3. Point FOLDSHIFT_WEB_PATH to the executable."
+            );
+        }
+    };
+
+    println!("Launching FoldShift UI via '{}'...", engine.display());
+    let mut cmd = std::process::Command::new(engine);
+    cmd.arg("--host").arg(host);
+    cmd.arg("--port").arg(port.to_string());
+    if no_open {
+        cmd.arg("--no-open");
+    }
+
+    let status = cmd.status()?;
+    if !status.success() {
+        if let Some(code) = status.code() {
+            if code != 0 && code != 130 {
+                anyhow::bail!("FoldShift UI exited with status: {}", code);
+            }
+        }
+    }
+
     Ok(())
 }
 

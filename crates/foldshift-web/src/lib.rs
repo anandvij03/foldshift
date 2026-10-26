@@ -9,10 +9,12 @@ use axum::{
     routing::{get, post},
 };
 use foldshift_image::EncodeOptions;
+use tokio::sync::watch;
 use serde::Serialize;
 use serde_json::json;
 
 pub const INDEX_HTML: &str = include_str!("index.html");
+pub const MANIFEST_JSON: &str = include_str!("../../../dist/manifest.json");
 
 #[derive(Serialize)]
 pub struct SystemStatus {
@@ -27,10 +29,17 @@ pub struct SystemStatus {
     pub media_source: Option<String>,
 }
 
-pub fn app() -> Router {
+#[derive(Clone)]
+pub struct WebState {
+    pub shutdown_tx: watch::Sender<bool>,
+}
+
+pub fn app_with_state(state: WebState) -> Router {
     Router::new()
         .route("/", get(serve_index))
         .route("/api/capabilities", get(api_capabilities))
+        .route("/api/manifest", get(api_manifest))
+        .route("/api/system/shutdown", post(api_system_shutdown))
         .route("/api/packs", get(api_packs))
         .route("/api/packs/install", post(api_packs_install))
         .route("/api/inspect", post(api_inspect))
@@ -43,10 +52,24 @@ pub fn app() -> Router {
         .route("/api/video/inspect", post(api_video_inspect))
         .route("/api/video/convert", post(api_video_convert))
         .route("/api/video/extract-audio", post(api_video_extract_audio))
+        .with_state(state)
         .layer(DefaultBodyLimit::max(100 * 102_400)) // 100 MB limit
 }
 
+pub fn app() -> Router {
+    let (tx, _) = tokio::sync::watch::channel(false);
+    app_with_state(WebState { shutdown_tx: tx })
+}
+
 pub async fn run(addr: SocketAddr, auto_open: bool) -> anyhow::Result<()> {
+    let (shutdown_tx, mut shutdown_rx) = tokio::sync::watch::channel(false);
+
+    let ctrl_tx = shutdown_tx.clone();
+    let _ = ctrlc::set_handler(move || {
+        println!("\nShutdown signal (Ctrl+C) received. Stopping server...");
+        let _ = ctrl_tx.send(true);
+    });
+
     let listener = tokio::net::TcpListener::bind(addr).await?;
     let url = format!("http://{}", addr);
 
@@ -54,15 +77,84 @@ pub async fn run(addr: SocketAddr, auto_open: bool) -> anyhow::Result<()> {
     println!("  FoldShift Web UI v0.1.0");
     println!("  Local-first file processing. Files stay on device.");
     println!("  Running at: {}", url);
-    println!("  Press Ctrl+C to terminate.");
+    println!("  Press Ctrl+C or use UI 'Shutdown' to terminate.");
     println!("====================================================");
 
     if auto_open {
         let _ = open_browser(&url);
     }
 
-    axum::serve(listener, app()).await?;
+    let app = app_with_state(WebState { shutdown_tx });
+
+    axum::serve(listener, app)
+        .with_graceful_shutdown(async move {
+            while !*shutdown_rx.borrow() {
+                if shutdown_rx.changed().await.is_err() {
+                    break;
+                }
+            }
+            println!("FoldShift local server cleanly terminated. Exiting.");
+        })
+        .await?;
+
     Ok(())
+}
+
+async fn api_manifest() -> impl IntoResponse {
+    let manifest_val: serde_json::Value = serde_json::from_str(MANIFEST_JSON)
+        .unwrap_or_else(|_| json!({ "error": "Invalid manifest json" }));
+
+    let pdf_pack_installed = foldshift_core::pack::is_capability_installed("pdf");
+    let media_pack_installed = foldshift_core::pack::is_capability_installed("media");
+
+    let engine_packs = json!([
+        {
+            "id": "pdf",
+            "name": "PDF Engine Pack",
+            "engine": "qpdf",
+            "version": "11.9.0",
+            "description": "Subprocess adapter for structural PDF merge, page extraction, and inspection",
+            "download_bytes": 12690000,
+            "installed_bytes": 29780000,
+            "installed": pdf_pack_installed,
+            "license": "Apache-2.0",
+            "shared": false,
+            "install_cmd": "foldshift packs install pdf --from-file <path>"
+        },
+        {
+            "id": "media",
+            "name": "Media Engine Pack",
+            "engine": "ffmpeg",
+            "version": "7.0.2",
+            "description": "Unified subprocess adapter for audio transcoding/inspection and video operations",
+            "download_bytes": 33030000,
+            "installed_bytes": 75490000,
+            "installed": media_pack_installed,
+            "license": "LGPL-2.1 / GPL-2.0+",
+            "shared": true,
+            "shared_capabilities": ["audio", "video"],
+            "install_cmd": "foldshift packs install media --from-file <path>"
+        }
+    ]);
+
+    Json(json!({
+        "manifest": manifest_val,
+        "engine_packs": engine_packs,
+        "capabilities": foldshift_core::operations(),
+    }))
+}
+
+async fn api_system_shutdown(
+    axum::extract::State(state): axum::extract::State<WebState>,
+) -> impl IntoResponse {
+    let _ = state.shutdown_tx.send(true);
+    (
+        StatusCode::OK,
+        Json(json!({
+            "status": "shutting_down",
+            "message": "FoldShift local server is stopping cleanly. No background daemons will remain."
+        })),
+    )
 }
 
 pub fn open_browser(url: &str) -> std::io::Result<()> {

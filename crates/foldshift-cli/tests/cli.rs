@@ -1249,3 +1249,59 @@ fn cli_batch_video_convert_with_bounded_concurrency() {
     assert!(out_dir.join("batch_02_clip2.webm").exists());
     assert!(out_dir.join("batch_03_clip3.webm").exists());
 }
+
+#[test]
+fn cli_ui_shows_guidance_when_web_missing() {
+    let result = Command::new(env!("CARGO_BIN_EXE_foldshift"))
+        .args(["ui", "--host", "127.0.0.1", "--port", "9999", "--no-open"])
+        .env("FOLDSHIFT_WEB_PATH", "c:/non_existent_foldshift_web_path_xyz.exe")
+        .env_remove("PATH")
+        .output()
+        .unwrap();
+
+    assert!(!result.status.success());
+    let stderr = String::from_utf8_lossy(&result.stderr);
+    assert!(
+        stderr.contains("FoldShift Web UI executable ('foldshift-web') was not found"),
+        "stderr was: {}",
+        stderr
+    );
+    assert!(stderr.contains("optional desktop distribution package"));
+}
+
+#[test]
+fn cli_ui_invokes_web_binary_with_args() {
+    let dir = tempfile::tempdir().unwrap();
+    let mock_path = if cfg!(windows) {
+        let p = dir.path().join("mock_web.cmd");
+        std::fs::write(&p, "@echo off\r\necho MOCK_WEB_RUNNING %*\r\nexit /b 0\r\n").unwrap();
+        p
+    } else {
+        let p = dir.path().join("mock_web.sh");
+        std::fs::write(&p, "#!/bin/sh\necho MOCK_WEB_RUNNING \"$@\"\nexit 0\n").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        p
+    };
+
+    let result = Command::new(env!("CARGO_BIN_EXE_foldshift"))
+        .args(["ui", "--host", "127.0.0.1", "--port", "8999", "--no-open"])
+        .env("FOLDSHIFT_WEB_PATH", &mock_path)
+        .output()
+        .unwrap();
+
+    assert!(
+        result.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&result.stdout);
+    assert!(stdout.contains("Launching FoldShift UI"));
+    assert!(stdout.contains("MOCK_WEB_RUNNING"));
+    assert!(stdout.contains("--host 127.0.0.1"));
+    assert!(stdout.contains("--port 8999"));
+    assert!(stdout.contains("--no-open"));
+}
